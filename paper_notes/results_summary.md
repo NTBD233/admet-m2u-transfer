@@ -135,8 +135,12 @@ Initial manuscript draft sections are available in:
 The consolidated manuscript draft is available in:
 
 - `paper_notes/manuscript_draft.md`
+- `paper_notes/manuscript_submission.tex`
+- `paper_notes/manuscript_submission.pdf`
 
-Remaining writing task:
+Remaining writing tasks:
 
-- Replace citation placeholders with complete references.
-- Decide target venue formatting before converting to LaTeX or Word.
+- Review and polish the submission-style LaTeX draft.
+- Decide target venue formatting.
+- Finalize author list and affiliation.
+- Port the submission draft into the selected venue template.

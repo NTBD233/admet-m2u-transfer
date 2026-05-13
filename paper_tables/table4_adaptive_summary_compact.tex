@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Adaptive teacher-weighting negative ablation. The validation-advantage rule improves over base AdapterFusion in some settings, but is weaker than fixed strong distillation.}
+\label{tab:adaptive_summary}
+\begin{tabular}{lc}
+\toprule
+Comparison & Result \\
+\midrule
+Adaptive beats base AdapterFusion & 9/15 \\
+Adaptive beats fixed $\lambda=1.0$ & 3/15 \\
+Adaptive beats best fixed lambda & 1/15 \\
+Mean $\Delta$ vs fixed $\lambda=1.0$ & 0.0817 \\
+\bottomrule
+\end{tabular}
+\end{table}

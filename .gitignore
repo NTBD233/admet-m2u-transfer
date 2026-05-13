@@ -22,3 +22,13 @@ logs/
 *.joblib
 *.npz
 *.npy
+
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.xdv
+*.synctex.gz

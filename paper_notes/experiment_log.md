@@ -41,6 +41,13 @@ regression result but not the BBB classification result.
   Results, and Discussion.
 - A consolidated full manuscript draft was generated at
   `paper_notes/manuscript_draft.md`.
+- A submission-style LaTeX manuscript was generated and compiled at
+  `paper_notes/manuscript_submission.tex` and
+  `paper_notes/manuscript_submission.pdf`.
+- Paper figures and compact LaTeX result tables were generated for the
+  submission draft.
+- A submission readiness checklist was generated at
+  `paper_notes/submission_checklist.md`.
 
 ## Next Runs
 
@@ -50,3 +57,4 @@ regression result but not the BBB classification result.
 3. Use `paper_tables/table4_adaptive_summary.md` as a negative ablation.
 4. Replace citation placeholders in `paper_notes/manuscript_draft.md` with
    complete BibTeX-ready references.
+5. Port `paper_notes/manuscript_submission.tex` into a specific venue template.
