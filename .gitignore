@@ -15,6 +15,7 @@ results/*
 !results/.gitkeep
 results_*/
 logs/
+outputs/
 
 *.pt
 *.pth

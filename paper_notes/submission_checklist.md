@@ -22,6 +22,9 @@
 - LaTeX build completed with XeLaTeX and BibTeX.
 - References resolved against `references.bib`.
 - Main table and ablation tables are included directly in the LaTeX manuscript.
+- Main regression table now includes `DescPred`, `AdapterFusion`,
+  `ECFP4+Desc RF`, and distilled AdapterFusion, so the AdapterFusion-vs-DescPred
+  claim is directly checkable from the manuscript.
 - Method equations are numbered and referenced through standard LaTeX equation environments.
 - Figures are included as PDF assets.
 - Main claim remains controlled:
@@ -61,8 +64,8 @@
 - Classification is only supplementary because results are less stable.
 - The method should not be described as state-of-the-art.
 - The student still trails descriptor-access RF in most settings.
-- TinyTeX compilation currently leaves one negligible overfull warning
-  (`0.69199pt`); this is not blocking but can be cleaned during venue formatting.
+- Current XeLaTeX/BibTeX build has no undefined citation/reference warnings and
+  no overfull/underfull warnings in the latest log.
 
 ## Recommended Next Step
 

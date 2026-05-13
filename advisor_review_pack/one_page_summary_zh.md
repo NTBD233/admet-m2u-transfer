@@ -81,7 +81,7 @@ classification ADMET 结果仅作为 supplementary，不作为主结论。
 
 2. **AdapterFusion 优于简单 DescPred。**
 
-   在 regression ADMET 上，结构化 pseudo-descriptor adapter + gated fusion 比简单辅助 descriptor prediction 更稳定。
+   在 15/15 个 regression dataset-ratio setting 上，结构化 pseudo-descriptor adapter + gated fusion 比简单辅助 descriptor prediction 更好。
 
 3. **Teacher distillation 有效但有限。**
 
@@ -163,3 +163,9 @@ classification ADMET 结果仅作为 supplementary，不作为主结论。
 3. 是否需要补 Chemprop 或 pretrained encoder baseline？
 4. 是否应该继续强化 regression，还是尝试解释 classification 失败？
 5. 更合适的投稿目标是 workshop、BIBM-style conference，还是 journal short communication？
+
+## 当前封版状态
+
+- 英文 LaTeX 初稿已完成投稿前润色。
+- 主表已包含 `DescPred`，因此可以直接支撑 AdapterFusion 优于简单 auxiliary descriptor prediction 的判断。
+- 当前版本适合导师预审；若目标提高到 Q1/journal，则建议另起扩展版方案，而不是继续在当前短稿上小修。
