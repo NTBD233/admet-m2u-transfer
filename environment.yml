@@ -1,0 +1,12 @@
+name: tdc-admet
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - rdkit
+  - pytorch
+  - scikit-learn
+  - xgboost
+  - pip
