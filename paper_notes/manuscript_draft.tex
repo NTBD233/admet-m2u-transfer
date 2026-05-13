@@ -1,0 +1,638 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage[]{natbib}
+\bibliographystyle{plainnat}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Descriptor-Teacher Guided Multi-to-Uni Transfer for Low-Resource Regression ADMET Prediction},
+  pdfauthor={Author names to be added},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Descriptor-Teacher Guided Multi-to-Uni Transfer for Low-Resource
+Regression ADMET Prediction}
+\author{Author names to be added}
+\date{}
+
+\begin{document}
+\maketitle
+
+\subsection{Abstract}\label{abstract}
+
+Low-resource ADMET prediction is a recurring challenge in early-stage
+drug discovery, where labeled assays are limited but inexpensive
+molecular knowledge such as physicochemical descriptors is readily
+available. We study whether descriptor knowledge can be transferred into
+an ECFP-only neural predictor, so that descriptors guide training
+without being required at inference time. We develop Descriptor-Teacher
+AdapterFusion, a lightweight ECFP4-based student model that combines an
+adapter-based pseudo-descriptor representation with descriptor
+reconstruction and teacher prediction distillation from an
+ECFP4+descriptor random forest. Across five regression ADMET datasets,
+three low-resource training ratios, and three random seeds, fixed
+teacher distillation with \texttt{lambda\_distill\ =\ 1.0} improves
+AdapterFusion in 11/15 dataset-ratio settings, with an average RMSE
+change of -0.0656 relative to the undistilled AdapterFusion baseline.
+However, descriptor-access random forest models remain stronger in most
+settings, indicating that the proposed method partially transfers
+descriptor knowledge but does not replace direct descriptor access. A
+lambda sweep and adaptive-weighting ablation further show that simple
+validation-based adaptive distillation is not sufficient. These results
+support a controlled descriptor-guided multi-to-uni transfer perspective
+for low-resource regression ADMET prediction.
+
+\subsection{1. Introduction}\label{introduction}
+
+Accurate ADMET prediction is important for early drug discovery because
+absorption, distribution, metabolism, excretion, and toxicity properties
+affect which candidate molecules can progress beyond screening
+\citep{Vamathevan2019, Butler2018, Xiong2021ADMETlab}. In practice, many
+ADMET prediction tasks are low-resource: labels are expensive to obtain,
+measurements vary across assays, and each property may have a limited
+number of reliable annotated compounds. This makes it useful to study
+lightweight models and auxiliary molecular knowledge that can improve
+generalization under limited supervision.
+
+Molecular descriptors provide one such source of auxiliary knowledge.
+RDKit physicochemical descriptors such as molecular weight, LogP, TPSA,
+hydrogen bond counts, rotatable bonds, and ring counts are inexpensive
+to compute and often correlate with ADMET behavior \citep{RDKit2026}. A
+direct way to exploit them is to concatenate descriptors with molecular
+fingerprints or use descriptor-based traditional models. However, this
+creates a descriptor-access inference setting. In contrast, a
+multi-to-uni transfer setting asks whether descriptor knowledge can be
+used during training while the deployed student model uses only a single
+modality, here ECFP4 fingerprints \citep{Rogers2010}.
+
+This paper studies descriptor-guided multi-to-uni transfer for
+low-resource ADMET prediction. We begin from an ECFP4 MLP baseline and
+compare simple auxiliary descriptor prediction with a structured
+AdapterFusion student that uses an ECFP-derived pseudo-descriptor
+adapter and a learned fusion gate. We then add teacher prediction
+distillation from an \texttt{ECFP4\_Desc\_RF} model, using a
+descriptor-access random forest as a teacher for an ECFP-only neural
+student.
+
+Our central question is not whether a lightweight neural model can beat
+all descriptor-access baselines. Instead, we ask a narrower and more
+controlled question: can descriptor-access knowledge improve an
+ECFP-only student in low-resource regression ADMET? The answer is
+positive but bounded. Teacher distillation improves AdapterFusion in
+most regression settings, but the descriptor-access teacher and
+descriptor-based RF baselines remain strong.
+
+The contributions are:
+
+\begin{itemize}
+\tightlist
+\item
+  We formulate a lightweight descriptor-guided multi-to-uni transfer
+  setup for low-resource ADMET prediction.
+\item
+  We compare ECFP-only descriptor prediction, AdapterFusion,
+  descriptor-access controls, random forest baselines, and
+  teacher-distilled AdapterFusion under shared low-resource splits.
+\item
+  We show that fixed descriptor-teacher distillation improves regression
+  AdapterFusion in 11/15 dataset-ratio settings.
+\item
+  We report lambda sensitivity, validation-selected lambda analysis, and
+  a negative adaptive-weighting ablation, clarifying when simple teacher
+  weighting is insufficient.
+\end{itemize}
+
+\subsection{2. Related Work}\label{related-work}
+
+Molecular representation learning has increasingly used auxiliary
+objectives to inject chemical knowledge into learned representations.
+Molecular language models such as MolBERT and related approaches
+motivate the use of domain-relevant pretraining or auxiliary tasks
+rather than relying only on generic representation learning objectives
+\citep{Fabian2020MolBERT}. Graph pretraining methods such as molecular
+GNN pretraining, GROVER, and GraphMVP similarly use self-supervised or
+cross-view objectives to improve downstream molecular prediction
+\citep{Hu2020PretrainGNN, Rong2020GROVER, Liu2022GraphMVP}. Our work is
+smaller in scale and does not use a large pretrained sequence encoder,
+but it shares the principle that chemically meaningful auxiliary targets
+can shape molecular representations.
+
+Auxiliary learning and task-specific adaptation are also relevant. A
+simple auxiliary objective may not transfer all useful knowledge to the
+downstream task; the architecture through which auxiliary information is
+routed can matter \citep{Ruder2017, Dey2024AuxAdapt}. In this work,
+\texttt{DescPred} represents plain descriptor prediction, while
+AdapterFusion represents a task-specific transfer mechanism that creates
+and fuses a pseudo-descriptor representation.
+
+The closest conceptual motivation is multi-to-uni molecular
+representation learning, including M2UMol-style knowledge transfer
+\citep{Xiong2026M2UMol}. Those works study how multimodal molecular
+knowledge can improve unimodal inference. Our setting is deliberately
+controlled: descriptors are the auxiliary modality, ECFP4 is the
+inference modality, and ADMET prediction is the downstream task.
+
+ADMET benchmark modeling provides the application context. We use
+TDC-style ADMET datasets and evaluate low-resource splits across
+regression and classification properties \citep{Huang2021TDC}.
+MoleculeNet provides an earlier benchmarking reference point for
+molecular property prediction metrics, splits, and baselines
+\citep{Wu2018MoleculeNet}. The main method claim is limited to
+regression ADMET because the observed distillation signal is more
+consistent there than in classification.
+
+Our baseline choices are also grounded in prior molecular property
+prediction practice. Fingerprint and descriptor models remain important
+controls in cheminformatics, while graph neural networks and directed
+message-passing models provide stronger learned-representation baselines
+in larger studies
+\citep{Kearnes2016GraphConv, Yang2019DMPNN, Xiong2020AttentiveFP, Heid2024Chemprop}.
+Tree ensembles are included because random forests and gradient boosting
+methods remain competitive for tabular molecular features
+\citep{Breiman2001, Chen2016XGBoost, Ke2017LightGBM, Tian2022ADMETBoost}.
+
+\subsection{3. Method}\label{method}
+
+\subsubsection{3.1 Problem Setting}\label{problem-setting}
+
+Each molecule has an ECFP4 fingerprint \texttt{x\_ecfp}, optional
+descriptor vector \texttt{x\_desc}, and target \texttt{y}. The primary
+inference constraint is that the student model should use only
+\texttt{x\_ecfp} at test time. Descriptor information may be used during
+training as auxiliary supervision or through teacher predictions.
+
+For regression tasks, the task loss is mean squared error. For
+classification reference experiments, the task loss is binary cross
+entropy. The main paper focuses on regression.
+
+\subsubsection{3.2 ECFP Encoder}\label{ecfp-encoder}
+
+The base ECFP model maps a 2048-dimensional ECFP4 fingerprint to a
+128-dimensional latent representation using a two-layer MLP with batch
+normalization, ReLU activations, and dropout:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{z\_fp = f\_fp(x\_ecfp)}
+\end{Highlighting}
+\end{Shaded}
+
+The \texttt{ECFP4\_MLP} baseline predicts the downstream property from
+\texttt{z\_fp}.
+
+\subsubsection{3.3 Descriptor Prediction
+Baseline}\label{descriptor-prediction-baseline}
+
+The \texttt{ECFP4\_MLP\_DescPred} baseline adds an auxiliary descriptor
+prediction head to the ECFP encoder. The model predicts the downstream
+target from \texttt{z\_fp} and predicts standardized RDKit descriptors
+from the same representation.
+
+The descriptor vector contains nine RDKit descriptors:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{MolWt, LogP, TPSA, HBA, HBD, RotBonds, AromaticRings, HeavyAtoms, RingCount}
+\end{Highlighting}
+\end{Shaded}
+
+The training objective is:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{L = L\_task + lambda\_transfer * L\_desc}
+\end{Highlighting}
+\end{Shaded}
+
+where \texttt{lambda\_transfer\ =\ 0.1}.
+
+\subsubsection{3.4 AdapterFusion Student}\label{adapterfusion-student}
+
+The AdapterFusion student uses the same ECFP encoder but introduces a
+pseudo-descriptor adapter:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{z\_desc = f\_adapter(z\_fp)}
+\end{Highlighting}
+\end{Shaded}
+
+A learned fusion gate combines the original ECFP representation and the
+pseudo-descriptor representation:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{g = sigmoid(f\_gate([z\_fp, z\_desc]))}
+\NormalTok{z\_fused = g * z\_fp + (1 {-} g) * z\_desc}
+\end{Highlighting}
+\end{Shaded}
+
+The target prediction head receives \texttt{z\_fused}, while the
+descriptor prediction head predicts descriptors from \texttt{z\_desc}.
+This structure keeps inference ECFP-only, because no true descriptors
+are consumed by the student at test time.
+
+\subsubsection{3.5 Descriptor-Access
+Controls}\label{descriptor-access-controls}
+
+We include descriptor-access controls to estimate the value of direct
+descriptor information. \texttt{ECFP4\_MLP\_DescConcat} concatenates
+ECFP4 and standardized descriptors as neural input. We also train random
+forest baselines with ECFP4-only, descriptor-only, and ECFP4+descriptor
+inputs.
+
+The \texttt{ECFP4\_Desc\_RF} baseline is used as the descriptor-access
+teacher for distillation. This follows the broader teacher-student idea
+of knowledge distillation, where a deployed student is trained to match
+predictions from a stronger or richer teacher \citep{Hinton2015}.
+
+\subsubsection{3.6 Descriptor-Teacher
+Distillation}\label{descriptor-teacher-distillation}
+
+The main method, Descriptor-Teacher AdapterFusion, keeps the
+AdapterFusion student architecture and adds a teacher prediction loss.
+For regression, the teacher loss is:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{L\_teacher = MSE(y\_student, y\_teacher)}
+\end{Highlighting}
+\end{Shaded}
+
+The final loss is:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{L = L\_task + lambda\_transfer * L\_desc + lambda\_distill * L\_teacher}
+\end{Highlighting}
+\end{Shaded}
+
+The main configuration uses:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{lambda\_transfer = 0.1}
+\NormalTok{lambda\_distill = 1.0}
+\end{Highlighting}
+\end{Shaded}
+
+This value is selected from the fixed lambda sweep over
+\texttt{\{0.01,\ 0.1,\ 0.3,\ 1.0\}}. The model architecture is unchanged
+relative to AdapterFusion; only the training objective is augmented with
+teacher supervision.
+
+\subsection{4. Experiments}\label{experiments}
+
+\subsubsection{4.1 Datasets}\label{datasets}
+
+The main regression benchmark includes five ADMET datasets:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{caco2\_wang}
+\item
+  \texttt{lipophilicity\_astrazeneca}
+\item
+  \texttt{solubility\_aqsoldb}
+\item
+  \texttt{vdss\_lombardo}
+\item
+  \texttt{ppbr\_az}
+\end{itemize}
+
+Supplementary classification experiments include:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{bbb\_martins}
+\item
+  \texttt{hia\_hou}
+\item
+  \texttt{pgp\_broccatelli}
+\item
+  \texttt{bioavailability\_ma}
+\item
+  \texttt{herg}
+\end{itemize}
+
+The main claims are restricted to regression tasks.
+
+\subsubsection{4.2 Low-Resource Protocol}\label{low-resource-protocol}
+
+Each dataset is evaluated with training ratios of 10\%, 20\%, and 50\%.
+Each setting is run with seeds 42, 123, and 3407. All models use the
+same dataset-ratio-seed splits. Descriptor scalers are fit only on the
+training split to avoid leakage.
+
+\subsubsection{4.3 Baselines}\label{baselines}
+
+We compare:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{ECFP4\_MLP}
+\item
+  \texttt{ECFP4\_MLP\_DescPred}
+\item
+  \texttt{ECFP4\_MLP\_DescAdapterFusion}
+\item
+  \texttt{ECFP4\_MLP\_DescConcat}
+\item
+  \texttt{ECFP4\_RF}
+\item
+  \texttt{Desc\_RF}
+\item
+  \texttt{ECFP4\_Desc\_RF}
+\item
+  Descriptor-Teacher AdapterFusion
+\end{itemize}
+
+\texttt{ECFP4\_MLP\_DescConcat}, \texttt{Desc\_RF}, and
+\texttt{ECFP4\_Desc\_RF} use descriptors at inference and should be
+interpreted as descriptor-access controls rather than ECFP-only
+students.
+
+\subsubsection{4.4 Metrics}\label{metrics}
+
+Regression tasks use MAE and RMSE, with RMSE as the primary metric.
+Classification tasks use ROC-AUC and PR-AUC, with ROC-AUC reported in
+the supplementary classification table. All tables report mean
+plus/minus standard deviation over three seeds.
+
+\subsubsection{4.5 Ablations}\label{ablations}
+
+We run three ablation analyses:
+
+\begin{itemize}
+\tightlist
+\item
+  Fixed distillation lambda sweep:
+  \texttt{lambda\_distill\ in\ \{0.01,\ 0.1,\ 0.3,\ 1.0\}}.
+\item
+  Validation-selected lambda analysis, where the lambda with lowest mean
+  validation RMSE is selected per dataset-ratio setting without
+  retraining.
+\item
+  Adaptive teacher weighting using validation teacher advantage:
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{lambda\_effective = lambda\_max * max((base\_valid\_rmse {-} teacher\_valid\_rmse) / base\_valid\_rmse, 0)}
+\end{Highlighting}
+\end{Shaded}
+
+The adaptive rule is treated as a negative ablation.
+
+\subsection{5. Results}\label{results}
+
+\subsubsection{5.1 Main Regression
+Results}\label{main-regression-results}
+
+Table 1 is provided in
+\texttt{paper\_tables/table1\_regression\_main\_rmse.md}. The main
+pattern is that descriptor-access RF models remain strong, confirming
+that descriptor information is predictive for ADMET properties. However,
+among ECFP-only neural models, AdapterFusion is consistently stronger
+than simple descriptor prediction on regression tasks.
+
+Before teacher distillation, AdapterFusion improves over DescPred in all
+15 regression dataset-ratio settings. This supports the hypothesis that
+descriptor knowledge is better transferred through a structured
+pseudo-descriptor adapter and fusion mechanism than through a plain
+auxiliary descriptor head alone.
+
+\subsubsection{5.2 Descriptor-Teacher
+Distillation}\label{descriptor-teacher-distillation-1}
+
+Teacher distillation further improves AdapterFusion. With
+\texttt{lambda\_distill\ =\ 1.0}, distilled AdapterFusion improves over
+base AdapterFusion in 11/15 regression settings. The mean RMSE delta
+versus base AdapterFusion is -0.0656.
+
+The gains are most visible in settings where the descriptor-access
+teacher has a large advantage over the ECFP-only neural student. For
+example, \texttt{ppbr\_az} benefits from fixed strong distillation
+across all three training ratios. Nevertheless, the distilled student
+remains below the descriptor-access RF teacher in most settings. The
+result should therefore be interpreted as partial descriptor knowledge
+transfer, not replacement of descriptor-access baselines.
+
+\subsubsection{5.3 Lambda Sensitivity}\label{lambda-sensitivity}
+
+The lambda ablation is provided in
+\texttt{paper\_tables/table2\_lambda\_ablation\_rmse.md} and summarized
+in \texttt{paper\_tables/table3\_lambda\_summary.md}.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3077}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+lambda\_distill
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+complete settings
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+beats AdapterFusion
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+mean delta vs AdapterFusion
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+0.01 & 15/15 & 8/15 & 0.0075 \\
+0.1 & 15/15 & 8/15 & -0.0221 \\
+0.3 & 15/15 & 10/15 & -0.0046 \\
+1.0 & 15/15 & 11/15 & -0.0656 \\
+\end{longtable}
+}
+
+The strongest global fixed value is \texttt{lambda\_distill\ =\ 1.0}.
+Smaller lambdas can be better for individual settings, but they do not
+improve aggregate performance.
+
+\subsubsection{5.4 Validation-Selected
+Lambda}\label{validation-selected-lambda}
+
+The validation-selected lambda analysis is shown in
+\texttt{paper\_tables/table6\_validation\_selected\_lambda.md}.
+Selecting lambda by mean validation RMSE beats fixed
+\texttt{lambda\_distill\ =\ 1.0} in only 2/15 settings. It beats base
+AdapterFusion in 12/15 settings.
+
+This suggests that validation-selected lambda is useful as an analysis
+but does not provide a stronger default than fixed
+\texttt{lambda\_distill\ =\ 1.0} under the current setup.
+
+\subsubsection{5.5 Adaptive Distillation Negative
+Ablation}\label{adaptive-distillation-negative-ablation}
+
+The adaptive teacher-weighting result is shown in
+\texttt{paper\_tables/table4\_adaptive\_summary.md} and
+\texttt{paper\_tables/table5\_adaptive\_vs\_fixed.md}. The adaptive rule
+improves over base AdapterFusion in 9/15 settings, but beats fixed
+\texttt{lambda\_distill\ =\ 1.0} in only 3/15 settings and beats the
+best fixed lambda in only 1/15 settings. Its mean RMSE delta relative to
+fixed \texttt{lambda\_distill\ =\ 1.0} is 0.0817, indicating worse
+average performance.
+
+This negative result shows that raw validation teacher advantage is not
+a sufficient reliability signal for adaptive distillation.
+
+\subsubsection{5.6 Classification
+Reference}\label{classification-reference}
+
+Classification results are provided in
+\texttt{paper\_tables/tableS1\_classification\_main\_roc\_auc.md}. The
+results are less stable than regression results, and the current
+teacher-distillation claim is therefore limited to regression ADMET.
+
+\subsection{6. Discussion}\label{discussion}
+
+The experiments support a controlled descriptor-guided transfer story.
+Descriptor information is valuable, and descriptor-access baselines
+remain strong. The contribution is not to replace descriptor-access RF,
+but to show that descriptor-access knowledge can partially improve an
+ECFP-only neural student under low-resource regression ADMET settings.
+
+AdapterFusion improves over plain descriptor prediction, suggesting that
+the structure of auxiliary transfer matters. Teacher distillation then
+provides an additional improvement by aligning the ECFP-only student
+with predictions from a descriptor-access RF teacher.
+
+The lambda sweep shows that stronger teacher supervision is generally
+useful: \texttt{lambda\_distill\ =\ 1.0} is the best fixed global
+setting. However, the dataset-specific best lambda varies, and neither
+validation-selected lambda nor the tested adaptive rule clearly improves
+over the fixed setting. The adaptive failure is informative:
+dataset-level validation teacher advantage can underweight teacher
+supervision on settings where strong distillation is beneficial.
+
+Practically, these results recommend a cautious use of
+descriptor-teacher distillation. It can improve an ECFP-only regression
+student, but descriptor baselines should still be included and reported.
+
+\subsection{7. Limitations}\label{limitations}
+
+This work has several limitations. First, the main claim is restricted
+to regression ADMET tasks. Classification results are included only as
+supplementary evidence because improvements are less consistent. Second,
+the student model is lightweight and ECFP-based; the method has not yet
+been tested with large pretrained molecular encoders. Third,
+descriptor-access RF remains stronger than the distilled student in most
+settings. Finally, the adaptive teacher-weighting strategy tested here
+is simple and negative; more principled sample-level or learned teacher
+weighting may be needed.
+
+\subsection{8. Conclusion}\label{conclusion}
+
+We presented Descriptor-Teacher AdapterFusion, a lightweight
+descriptor-guided multi-to-uni transfer method for low-resource
+regression ADMET prediction. The method trains an ECFP-only
+AdapterFusion student with descriptor reconstruction and teacher
+prediction distillation from an ECFP+descriptor random forest. The main
+fixed setting, \texttt{lambda\_distill\ =\ 1.0}, improves AdapterFusion
+in 11/15 regression dataset-ratio settings. At the same time,
+descriptor-access RF baselines remain stronger, so the appropriate
+conclusion is controlled descriptor knowledge transfer rather than
+overall ADMET state-of-the-art performance.
+
+\bibliography{references}
+
+\end{document}
