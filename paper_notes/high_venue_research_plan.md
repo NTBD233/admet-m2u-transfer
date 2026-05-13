@@ -50,6 +50,11 @@ task loss
 The central methodological contribution is not the existence of multiple
 teachers, but selective teacher weighting by task and sample.
 
+A concrete technical design has been drafted in
+`paper_notes/high_venue_technical_design.md`. That document specifies teacher
+types, reliability signals, gating variants, training objectives, experiment
+stages, success thresholds, and the first implementation scope.
+
 ## Experimental Design
 
 Use the current paper as the base benchmark:
@@ -112,7 +117,12 @@ The high-venue paper needs analysis beyond aggregate RMSE:
 
 1. Freeze and commit the current pilot manuscript.
 2. Share the advisor review pack and ask whether the short-paper framing is acceptable.
-3. After advisor feedback, implement the first high-venue extension:
-   RF + XGBoost multi-teacher distillation with sample-level reliability
-   diagnostics.
-4. Add Chemprop only after the simpler multi-teacher pipeline is reproducible.
+3. Before training new students, run teacher reliability diagnostics:
+   generate RF/XGBoost teacher predictions, export uncertainty signals, and
+   measure teacher agreement, oracle teacher selection, uncertainty-error
+   correlation, and descriptor-space coverage effects.
+4. Use the diagnostics to decide whether the first high-venue method should be
+   multi-teacher reliability gating, single-teacher reliability weighting, or a
+   stronger ECFP-only student with descriptor-teacher distillation.
+5. Add Chemprop only after the simpler RF/XGBoost reliability pipeline is
+   reproducible.
