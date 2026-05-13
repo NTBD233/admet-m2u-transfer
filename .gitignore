@@ -16,6 +16,7 @@ results/*
 results_*/
 logs/
 outputs/
+dist/
 
 *.pt
 *.pth
