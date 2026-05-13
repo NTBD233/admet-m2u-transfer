@@ -61,6 +61,22 @@ Deferred teacher:
 
 No new student training in this stage.
 
+Implementation entrypoint:
+
+```bash
+make teacher-reliability
+```
+
+Optional teacher prediction export with uncertainty:
+
+```bash
+make teacher-predictions-multiteacher
+```
+
+Current RF-only diagnostics are summarized in:
+
+- `paper_notes/teacher_reliability_diagnostics_summary.md`
+
 ### Inputs
 
 For every dataset, ratio, seed, teacher:
@@ -280,4 +296,3 @@ Stop condition:
 - no teacher diversity;
 - no oracle selection headroom;
 - no reliability feature correlates with teacher error.
-
