@@ -26,7 +26,8 @@ low-resource regression ADMET prediction.
 
 Accurate ADMET prediction is important for early drug discovery because
 absorption, distribution, metabolism, excretion, and toxicity properties affect
-which candidate molecules can progress beyond screening. In practice, many
+which candidate molecules can progress beyond screening [@Vamathevan2019;
+@Butler2018; @Xiong2021ADMETlab]. In practice, many
 ADMET prediction tasks are low-resource: labels are expensive to obtain,
 measurements vary across assays, and each property may have a limited number of
 reliable annotated compounds. This makes it useful to study lightweight models
@@ -36,12 +37,12 @@ supervision.
 Molecular descriptors provide one such source of auxiliary knowledge. RDKit
 physicochemical descriptors such as molecular weight, LogP, TPSA, hydrogen bond
 counts, rotatable bonds, and ring counts are inexpensive to compute and often
-correlate with ADMET behavior. A direct way to exploit them is to concatenate
+correlate with ADMET behavior [@RDKit2026]. A direct way to exploit them is to concatenate
 descriptors with molecular fingerprints or use descriptor-based traditional
 models. However, this creates a descriptor-access inference setting. In
 contrast, a multi-to-uni transfer setting asks whether descriptor knowledge can
 be used during training while the deployed student model uses only a single
-modality, here ECFP4 fingerprints.
+modality, here ECFP4 fingerprints [@Rogers2010].
 
 This paper studies descriptor-guided multi-to-uni transfer for low-resource
 ADMET prediction. We begin from an ECFP4 MLP baseline and compare simple
@@ -76,7 +77,11 @@ Molecular representation learning has increasingly used auxiliary objectives
 to inject chemical knowledge into learned representations. Molecular language
 models such as MolBERT and related approaches motivate the use of
 domain-relevant pretraining or auxiliary tasks rather than relying only on
-generic representation learning objectives [CITATION: MolBERT]. Our work is
+generic representation learning objectives [@Fabian2020MolBERT]. Graph
+pretraining methods such as molecular GNN pretraining, GROVER, and GraphMVP
+similarly use self-supervised or cross-view objectives to improve downstream
+molecular prediction [@Hu2020PretrainGNN; @Rong2020GROVER; @Liu2022GraphMVP].
+Our work is
 smaller in scale and does not use a large pretrained sequence encoder, but it
 shares the principle that chemically meaningful auxiliary targets can shape
 molecular representations.
@@ -84,21 +89,32 @@ molecular representations.
 Auxiliary learning and task-specific adaptation are also relevant. A simple
 auxiliary objective may not transfer all useful knowledge to the downstream
 task; the architecture through which auxiliary information is routed can
-matter. In this work, `DescPred` represents plain descriptor prediction, while
+matter [@Ruder2017; @Dey2024AuxAdapt]. In this work, `DescPred` represents plain descriptor prediction, while
 AdapterFusion represents a task-specific transfer mechanism that creates and
 fuses a pseudo-descriptor representation.
 
 The closest conceptual motivation is multi-to-uni molecular representation
-learning, including M2UMol-style knowledge transfer [CITATION: M2UMol]. Those
+learning, including M2UMol-style knowledge transfer [@Xiong2026M2UMol]. Those
 works study how multimodal molecular knowledge can improve unimodal inference.
 Our setting is deliberately controlled: descriptors are the auxiliary modality,
 ECFP4 is the inference modality, and ADMET prediction is the downstream task.
 
 ADMET benchmark modeling provides the application context. We use TDC-style
 ADMET datasets and evaluate low-resource splits across regression and
-classification properties [CITATION: TDC]. The main method claim is limited to
+classification properties [@Huang2021TDC]. MoleculeNet provides an earlier
+benchmarking reference point for molecular property prediction metrics, splits,
+and baselines [@Wu2018MoleculeNet]. The main method claim is limited to
 regression ADMET because the observed distillation signal is more consistent
 there than in classification.
+
+Our baseline choices are also grounded in prior molecular property prediction
+practice. Fingerprint and descriptor models remain important controls in
+cheminformatics, while graph neural networks and directed message-passing
+models provide stronger learned-representation baselines in larger studies
+[@Kearnes2016GraphConv; @Yang2019DMPNN; @Xiong2020AttentiveFP; @Heid2024Chemprop].
+Tree ensembles are included because random forests and gradient boosting
+methods remain competitive for tabular molecular features [@Breiman2001;
+@Chen2016XGBoost; @Ke2017LightGBM; @Tian2022ADMETBoost].
 
 ## 3. Method
 
@@ -175,7 +191,9 @@ standardized descriptors as neural input. We also train random forest baselines
 with ECFP4-only, descriptor-only, and ECFP4+descriptor inputs.
 
 The `ECFP4_Desc_RF` baseline is used as the descriptor-access teacher for
-distillation.
+distillation. This follows the broader teacher-student idea of knowledge
+distillation, where a deployed student is trained to match predictions from a
+stronger or richer teacher [@Hinton2015].
 
 ### 3.6 Descriptor-Teacher Distillation
 
@@ -398,14 +416,67 @@ baselines remain stronger, so the appropriate conclusion is controlled
 descriptor knowledge transfer rather than overall ADMET state-of-the-art
 performance.
 
-## References To Complete
+## References
 
-- [CITATION: TDC] Therapeutics Data Commons benchmark/reference.
-- [CITATION: RDKit] RDKit descriptor and cheminformatics toolkit reference.
-- [CITATION: ECFP] Extended-connectivity fingerprints reference.
-- [CITATION: MolBERT] Molecular representation learning with language models
-  and domain-relevant auxiliary tasks.
-- [CITATION: Auxiliary adaptation] Enhancing molecular property prediction with
-  auxiliary learning and task-specific adaptation.
-- [CITATION: M2UMol] Multi-to-uni modal knowledge transfer pre-training for
-  molecular representation learning.
+BibTeX entries are provided in `paper_notes/references.bib`. The current
+Markdown draft uses citation keys in square brackets so it can be converted to
+LaTeX or another venue-specific format later.
+
+- [Breiman2001] Breiman, L. Random forests. Machine Learning 45, 5-32 (2001).
+- [Butler2018] Butler, K. T., Davies, D. W., Cartwright, H., Isayev, O. &
+  Walsh, A. Machine learning for molecular and materials science. Nature 559,
+  547-555 (2018).
+- [Chen2016XGBoost] Chen, T. & Guestrin, C. XGBoost: A scalable tree boosting
+  system. In Proceedings of the 22nd ACM SIGKDD International Conference on
+  Knowledge Discovery and Data Mining, 785-794 (2016).
+- [Dey2024AuxAdapt] Dey, V. & Ning, X. Enhancing molecular property prediction
+  with auxiliary learning and task-specific adaptation. Journal of
+  Cheminformatics 16, 85 (2024).
+- [Fabian2020MolBERT] Fabian, B. et al. Molecular representation learning with
+  language models and domain-relevant auxiliary tasks. arXiv:2011.13230
+  (2020).
+- [Heid2024Chemprop] Heid, E. et al. Chemprop: A machine learning package for
+  chemical property prediction. Journal of Chemical Information and Modeling
+  64, 4613-4629 (2024).
+- [Hinton2015] Hinton, G., Vinyals, O. & Dean, J. Distilling the knowledge in a
+  neural network. arXiv:1503.02531 (2015).
+- [Hu2020PretrainGNN] Hu, W. et al. Strategies for pre-training graph neural
+  networks. International Conference on Learning Representations (2020).
+- [Huang2021TDC] Huang, K. et al. Therapeutics Data Commons: Machine learning
+  datasets and tasks for drug discovery and development. NeurIPS Datasets and
+  Benchmarks (2021).
+- [Kearnes2016GraphConv] Kearnes, S. et al. Molecular graph convolutions:
+  Moving beyond fingerprints. Journal of Computer-Aided Molecular Design 30,
+  595-608 (2016).
+- [Ke2017LightGBM] Ke, G. et al. LightGBM: A highly efficient gradient boosting
+  decision tree. Advances in Neural Information Processing Systems 30 (2017).
+- [Liu2022GraphMVP] Liu, S. et al. Pre-training molecular graph representation
+  with 3D geometry. International Conference on Learning Representations
+  (2022).
+- [RDKit2026] RDKit: Open-source cheminformatics. https://www.rdkit.org.
+- [Rogers2010] Rogers, D. & Hahn, M. Extended-connectivity fingerprints.
+  Journal of Chemical Information and Modeling 50, 742-754 (2010).
+- [Rong2020GROVER] Rong, Y. et al. Self-supervised graph transformer on
+  large-scale molecular data. Advances in Neural Information Processing Systems
+  33 (2020).
+- [Ruder2017] Ruder, S. An overview of multi-task learning in deep neural
+  networks. arXiv:1706.05098 (2017).
+- [Tian2022ADMETBoost] Tian, H., Ketkar, R. & Tao, P. Accurate ADMET prediction
+  with XGBoost. arXiv:2204.07532 (2022).
+- [Vamathevan2019] Vamathevan, J. et al. Applications of machine learning in
+  drug discovery and development. Nature Reviews Drug Discovery 18, 463-477
+  (2019).
+- [Wu2018MoleculeNet] Wu, Z. et al. MoleculeNet: A benchmark for molecular
+  machine learning. Chemical Science 9, 513-530 (2018).
+- [Xiong2020AttentiveFP] Xiong, Z. et al. Pushing the boundaries of molecular
+  representation for drug discovery with the graph attention mechanism. Journal
+  of Medicinal Chemistry 63, 8749-8760 (2020).
+- [Xiong2021ADMETlab] Xiong, G. et al. ADMETlab 2.0: An integrated online
+  platform for accurate and comprehensive predictions of ADMET properties.
+  Nucleic Acids Research 49, W5-W14 (2021).
+- [Xiong2026M2UMol] Xiong, Z. et al. Multi-to-uni modal knowledge transfer
+  pre-training for molecular representation learning. Nature Communications 17,
+  3797 (2026).
+- [Yang2019DMPNN] Yang, K. et al. Analyzing learned molecular representations
+  for property prediction. Journal of Chemical Information and Modeling 59,
+  3370-3388 (2019).
