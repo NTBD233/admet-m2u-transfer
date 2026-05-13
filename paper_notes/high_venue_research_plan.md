@@ -55,6 +55,12 @@ A concrete technical design has been drafted in
 types, reliability signals, gating variants, training objectives, experiment
 stages, success thresholds, and the first implementation scope.
 
+The second-paper writing blueprint is in
+`paper_notes/second_paper_writing_blueprint.md`, and the concrete experiment
+matrix is in `paper_notes/second_paper_experiment_matrix.md`. A manuscript
+skeleton for the method-paper version is in
+`paper_notes/second_paper_manuscript_skeleton.md`.
+
 ## Experimental Design
 
 Use the current paper as the base benchmark:
