@@ -464,6 +464,7 @@ def train_one_model(
     teacher_models=None,
     multiteacher_strategy="uniform",
     lambda_distill=0.0,
+    lambda_gate_supervision=0.0,
     adaptive_distill_strategy="none",
     adaptive_base_results_root=None,
     skip_existing=False,
@@ -599,6 +600,7 @@ def train_one_model(
         task_loss_sum = 0.0
         transfer_loss_sum = 0.0
         distill_loss_sum = 0.0
+        gate_supervision_loss_sum = 0.0
         n_batches = 0
 
         for batch in train_loader:
@@ -633,6 +635,24 @@ def train_one_model(
                 teacher_weights=batch_teacher_weights,
                 lambda_distill=lambda_distill_effective,
             )
+            gate_supervision_loss = torch.tensor(0.0, device=DEVICE)
+            if (
+                gate_module is not None
+                and lambda_gate_supervision > 0
+                and batch_teacher_weights is not None
+                and teacher_pred is not None
+                and teacher_pred.ndim == 2
+                and teacher_pred.shape[1] > 1
+            ):
+                oracle_teacher_idx = torch.argmin(
+                    torch.abs(teacher_pred - y.view(-1, 1)),
+                    dim=1,
+                )
+                gate_supervision_loss = F.nll_loss(
+                    torch.log(batch_teacher_weights.clamp_min(1e-8)),
+                    oracle_teacher_idx,
+                )
+                total_loss = total_loss + lambda_gate_supervision * gate_supervision_loss
             total_loss.backward()
             optimizer.step()
 
@@ -640,12 +660,14 @@ def train_one_model(
             task_loss_sum += task_loss.item()
             transfer_loss_sum += transfer_loss.item()
             distill_loss_sum += distill_loss.item()
+            gate_supervision_loss_sum += gate_supervision_loss.item()
             n_batches += 1
 
         train_total_loss = total_loss_sum / max(n_batches, 1)
         train_task_loss = task_loss_sum / max(n_batches, 1)
         train_transfer_loss = transfer_loss_sum / max(n_batches, 1)
         train_distill_loss = distill_loss_sum / max(n_batches, 1)
+        train_gate_supervision_loss = gate_supervision_loss_sum / max(n_batches, 1)
 
         valid_metrics, _ = evaluate_model(model, valid_loader, task_type)
         current_metric = valid_metrics[main_metric]
@@ -656,6 +678,7 @@ def train_one_model(
             "train_task_loss": train_task_loss,
             "train_transfer_loss": train_transfer_loss,
             "train_distill_loss": train_distill_loss,
+            "train_gate_supervision_loss": train_gate_supervision_loss,
             **{f"valid_{k}": v for k, v in valid_metrics.items()},
         })
 
@@ -680,6 +703,7 @@ def train_one_model(
                 "lambda_transfer": lambda_transfer,
                 "lambda_distill": lambda_distill,
                 "lambda_distill_effective": lambda_distill_effective,
+                "lambda_gate_supervision": lambda_gate_supervision,
                 "adaptive_distill_strategy": adaptive_distill_strategy,
                 "teacher_model": teacher_model,
                 "teacher_models": teacher_models,
@@ -712,6 +736,7 @@ def train_one_model(
         "lambda_transfer": lambda_transfer,
         "lambda_distill": lambda_distill,
         "lambda_distill_effective": lambda_distill_effective,
+        "lambda_gate_supervision": lambda_gate_supervision,
         "adaptive_distill_strategy": adaptive_distill_strategy,
         "teacher_model": teacher_model,
         "teacher_models": teacher_models,
@@ -784,6 +809,7 @@ def parse_args():
         default="uniform",
     )
     parser.add_argument("--lambda-distill", type=float, default=0.0)
+    parser.add_argument("--lambda-gate-supervision", type=float, default=0.0)
     parser.add_argument(
         "--adaptive-distill-strategy",
         choices=["none", "teacher_valid_advantage"],
@@ -833,6 +859,7 @@ def main():
                         teacher_models=args.teacher_models,
                         multiteacher_strategy=args.multiteacher_strategy,
                         lambda_distill=args.lambda_distill,
+                        lambda_gate_supervision=args.lambda_gate_supervision,
                         adaptive_distill_strategy=args.adaptive_distill_strategy,
                         adaptive_base_results_root=args.adaptive_base_results_root,
                         skip_existing=args.skip_existing,
