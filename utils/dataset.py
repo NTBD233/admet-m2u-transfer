@@ -8,7 +8,7 @@ from utils.config import BATCH_SIZE, FEATURE_ROOT, TRAIN_RATIO_TAG
 
 
 class M2UFeatureDataset(Dataset):
-    def __init__(self, npz_path, task_type, teacher_path=None):
+    def __init__(self, npz_path, task_type, teacher_path=None, teacher_paths=None):
         data = np.load(npz_path, allow_pickle=True)
 
         self.X_fp = torch.tensor(data["X_fp"], dtype=torch.float32)
@@ -17,6 +17,7 @@ class M2UFeatureDataset(Dataset):
         self.smiles = data["smiles"]
         self.task_type = task_type
         self.teacher_pred = None
+        self.teacher_uncertainty = None
         if teacher_path is not None:
             teacher_data = np.load(teacher_path, allow_pickle=True)
             self.teacher_pred = torch.tensor(
@@ -28,6 +29,36 @@ class M2UFeatureDataset(Dataset):
                     f"Teacher predictions length mismatch for {teacher_path}: "
                     f"{len(self.teacher_pred)} != {len(self.y)}"
                 )
+            if "pred_uncertainty" in teacher_data.files:
+                self.teacher_uncertainty = torch.tensor(
+                    teacher_data["pred_uncertainty"],
+                    dtype=torch.float32,
+                ).view(-1, 1)
+        if teacher_paths is not None:
+            preds = []
+            uncertainties = []
+            for path in teacher_paths:
+                teacher_data = np.load(path, allow_pickle=True)
+                pred = torch.tensor(
+                    teacher_data["pred"],
+                    dtype=torch.float32,
+                ).view(-1, 1)
+                if len(pred) != len(self.y):
+                    raise ValueError(
+                        f"Teacher predictions length mismatch for {path}: "
+                        f"{len(pred)} != {len(self.y)}"
+                    )
+                preds.append(pred)
+                if "pred_uncertainty" in teacher_data.files:
+                    uncertainty = torch.tensor(
+                        teacher_data["pred_uncertainty"],
+                        dtype=torch.float32,
+                    ).view(-1, 1)
+                else:
+                    uncertainty = torch.full_like(pred, float("nan"))
+                uncertainties.append(uncertainty)
+            self.teacher_pred = torch.cat(preds, dim=1)
+            self.teacher_uncertainty = torch.cat(uncertainties, dim=1)
 
     def __len__(self):
         return len(self.y)
@@ -41,6 +72,8 @@ class M2UFeatureDataset(Dataset):
         }
         if self.teacher_pred is not None:
             item["teacher_pred"] = self.teacher_pred[idx]
+        if self.teacher_uncertainty is not None:
+            item["teacher_uncertainty"] = self.teacher_uncertainty[idx]
         return item
 
 
@@ -66,6 +99,7 @@ def make_loaders(
     train_ratio_tag=TRAIN_RATIO_TAG,
     teacher_root=None,
     teacher_model=None,
+    teacher_models=None,
     seed=None,
 ):
     train_path, valid_path, test_path = feature_paths(
@@ -75,6 +109,7 @@ def make_loaders(
     )
 
     teacher_train_path = None
+    teacher_train_paths = None
     if teacher_root is not None and teacher_model is not None and seed is not None:
         teacher_train_path = (
             Path(teacher_root)
@@ -86,8 +121,27 @@ def make_loaders(
         )
         if not teacher_train_path.exists():
             raise FileNotFoundError(f"Missing teacher predictions: {teacher_train_path}")
+    if teacher_root is not None and teacher_models is not None and seed is not None:
+        teacher_train_paths = []
+        for teacher_name in teacher_models:
+            teacher_path = (
+                Path(teacher_root)
+                / dataset_name
+                / teacher_name
+                / f"train_{train_ratio_tag}"
+                / f"seed_{seed}"
+                / f"train_{train_ratio_tag}_teacher_predictions.npz"
+            )
+            if not teacher_path.exists():
+                raise FileNotFoundError(f"Missing teacher predictions: {teacher_path}")
+            teacher_train_paths.append(teacher_path)
 
-    train_ds = M2UFeatureDataset(train_path, task_type, teacher_path=teacher_train_path)
+    train_ds = M2UFeatureDataset(
+        train_path,
+        task_type,
+        teacher_path=teacher_train_path,
+        teacher_paths=teacher_train_paths,
+    )
     valid_ds = M2UFeatureDataset(valid_path, task_type)
     test_ds = M2UFeatureDataset(test_path, task_type)
 

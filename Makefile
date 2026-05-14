@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PYTHON ?= python
 
-.PHONY: setup prepare features smoke train train-low-resource ml-baselines lambda-ablation analysis paper-tables summary teacher-predictions-regression teacher-predictions-multiteacher teacher-reliability distill-regression distill-regression-summary distill-lambda-sweep distill-lambda-summary distill-lambda-analysis distill-adaptive-smoke distill-adaptive-regression distill-adaptive-summary
+.PHONY: setup prepare features smoke train train-low-resource ml-baselines lambda-ablation analysis paper-tables summary teacher-predictions-regression teacher-predictions-multiteacher teacher-reliability multiteacher-uniform-smoke multiteacher-validation-smoke multiteacher-top1-smoke distill-regression distill-regression-summary distill-lambda-sweep distill-lambda-summary distill-lambda-analysis distill-adaptive-smoke distill-adaptive-regression distill-adaptive-summary
 
 setup:
 	bash setup_env.sh
@@ -47,6 +47,15 @@ teacher-predictions-multiteacher:
 
 teacher-reliability:
 	$(PYTHON) analyze_teacher_reliability.py
+
+multiteacher-uniform-smoke:
+	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy uniform --lambda-distill 1.0 --results-root results_multiteacher_uniform_smoke
+
+multiteacher-validation-smoke:
+	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy validation_weighted --lambda-distill 1.0 --results-root results_multiteacher_validation_smoke
+
+multiteacher-top1-smoke:
+	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy top1_validation --lambda-distill 1.0 --results-root results_multiteacher_top1_smoke
 
 distill-regression:
 	$(PYTHON) train.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-model ECFP4_Desc_RF --lambda-distill 0.1 --results-root results_distill_regression --skip-existing

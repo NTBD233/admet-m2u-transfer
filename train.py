@@ -56,6 +56,78 @@ def load_teacher_valid_metric(teacher_root, dataset_name, teacher_model, train_r
     return float(metrics[metric])
 
 
+def load_teacher_valid_metrics(teacher_root, dataset_name, teacher_models, train_ratio_tag, seed, metric):
+    return {
+        teacher_model: load_teacher_valid_metric(
+            teacher_root=teacher_root,
+            dataset_name=dataset_name,
+            teacher_model=teacher_model,
+            train_ratio_tag=train_ratio_tag,
+            seed=seed,
+            metric=metric,
+        )
+        for teacher_model in teacher_models
+    }
+
+
+def build_multiteacher_weights(
+    teacher_root,
+    teacher_models,
+    strategy,
+    dataset_name,
+    train_ratio_tag,
+    seed,
+    main_metric,
+    higher_is_better,
+):
+    if not teacher_models:
+        return None, None
+
+    if strategy == "uniform":
+        weights = np.full(len(teacher_models), 1.0 / len(teacher_models), dtype=np.float32)
+        info = {
+            "multiteacher_strategy": strategy,
+            "teacher_models": teacher_models,
+            "teacher_valid_metric_map": {},
+            "teacher_weight_map": {name: float(weight) for name, weight in zip(teacher_models, weights)},
+        }
+        return torch.tensor(weights, dtype=torch.float32, device=DEVICE), info
+
+    valid_metric_map = load_teacher_valid_metrics(
+        teacher_root=teacher_root,
+        dataset_name=dataset_name,
+        teacher_models=teacher_models,
+        train_ratio_tag=train_ratio_tag,
+        seed=seed,
+        metric=main_metric,
+    )
+    scores = np.asarray(
+        [
+            valid_metric_map[name] if higher_is_better else -valid_metric_map[name]
+            for name in teacher_models
+        ],
+        dtype=np.float32,
+    )
+
+    if strategy == "validation_weighted":
+        shifted = scores - scores.max()
+        weights = np.exp(shifted)
+        weights = weights / weights.sum()
+    elif strategy == "top1_validation":
+        weights = np.zeros(len(teacher_models), dtype=np.float32)
+        weights[int(np.argmax(scores))] = 1.0
+    else:
+        raise ValueError(f"Unknown multiteacher strategy: {strategy}")
+
+    info = {
+        "multiteacher_strategy": strategy,
+        "teacher_models": teacher_models,
+        "teacher_valid_metric_map": {k: float(v) for k, v in valid_metric_map.items()},
+        "teacher_weight_map": {name: float(weight) for name, weight in zip(teacher_models, weights)},
+    }
+    return torch.tensor(weights, dtype=torch.float32, device=DEVICE), info
+
+
 def resolve_lambda_distill(
     lambda_distill,
     adaptive_distill_strategy,
@@ -141,6 +213,7 @@ def compute_total_loss(
     model_name,
     lambda_transfer=LAMBDA_TRANSFER,
     teacher_pred=None,
+    teacher_weights=None,
     lambda_distill=0.0,
 ):
     pred = outputs["pred"]
@@ -158,7 +231,26 @@ def compute_total_loss(
 
     distill_loss = torch.tensor(0.0, device=pred.device)
     if teacher_pred is not None and lambda_distill > 0:
-        if task_type == "classification":
+        if teacher_pred.ndim == 2 and teacher_pred.shape[1] > 1:
+            if teacher_weights is None:
+                teacher_weights = torch.full(
+                    (teacher_pred.shape[1],),
+                    1.0 / teacher_pred.shape[1],
+                    device=pred.device,
+                )
+            per_teacher_losses = []
+            for idx in range(teacher_pred.shape[1]):
+                teacher_target = teacher_pred[:, idx].view_as(pred)
+                if task_type == "classification":
+                    teacher_loss = F.binary_cross_entropy_with_logits(pred, teacher_target)
+                elif task_type == "regression":
+                    teacher_loss = nn.MSELoss()(pred, teacher_target)
+                else:
+                    raise ValueError(f"Unknown task_type: {task_type}")
+                per_teacher_losses.append(teacher_loss)
+            per_teacher_losses = torch.stack(per_teacher_losses)
+            distill_loss = torch.sum(per_teacher_losses * teacher_weights)
+        elif task_type == "classification":
             distill_loss = F.binary_cross_entropy_with_logits(pred, teacher_pred)
         elif task_type == "regression":
             distill_loss = nn.MSELoss()(pred, teacher_pred)
@@ -211,6 +303,8 @@ def train_one_model(
     lambda_transfer=LAMBDA_TRANSFER,
     teacher_root=None,
     teacher_model=None,
+    teacher_models=None,
+    multiteacher_strategy="uniform",
     lambda_distill=0.0,
     adaptive_distill_strategy="none",
     adaptive_base_results_root=None,
@@ -236,6 +330,7 @@ def train_one_model(
         train_ratio_tag=train_ratio_tag,
         teacher_root=teacher_root,
         teacher_model=teacher_model,
+        teacher_models=teacher_models,
         seed=seed,
     )
 
@@ -249,6 +344,21 @@ def train_one_model(
     dataset_cfg = DATASETS[dataset_name]
     higher_is_better = dataset_cfg["higher_is_better"]
     main_metric = dataset_cfg["main_metric"]
+    teacher_weights = None
+    multiteacher_info = None
+    if teacher_models is not None:
+        if teacher_root is None:
+            raise ValueError("--teacher-root is required when using --teacher-models")
+        teacher_weights, multiteacher_info = build_multiteacher_weights(
+            teacher_root=teacher_root,
+            teacher_models=teacher_models,
+            strategy=multiteacher_strategy,
+            dataset_name=dataset_name,
+            train_ratio_tag=train_ratio_tag,
+            seed=seed,
+            main_metric=main_metric,
+            higher_is_better=higher_is_better,
+        )
     lambda_distill_effective, adaptive_distill_info = resolve_lambda_distill(
         lambda_distill=lambda_distill,
         adaptive_distill_strategy=adaptive_distill_strategy,
@@ -262,6 +372,12 @@ def train_one_model(
         main_metric=main_metric,
         higher_is_better=higher_is_better,
     )
+    if multiteacher_info is not None:
+        print(
+            f"{dataset_name} | {model_name} | seed={seed} | "
+            f"multiteacher={multiteacher_strategy} | "
+            f"weights={multiteacher_info['teacher_weight_map']}"
+        )
     if adaptive_distill_info is not None:
         print(
             f"{dataset_name} | {model_name} | seed={seed} | "
@@ -304,6 +420,7 @@ def train_one_model(
                 model_name=model_name,
                 lambda_transfer=lambda_transfer,
                 teacher_pred=teacher_pred,
+                teacher_weights=teacher_weights,
                 lambda_distill=lambda_distill_effective,
             )
             total_loss.backward()
@@ -354,9 +471,13 @@ def train_one_model(
                 "lambda_distill_effective": lambda_distill_effective,
                 "adaptive_distill_strategy": adaptive_distill_strategy,
                 "teacher_model": teacher_model,
+                "teacher_models": teacher_models,
+                "multiteacher_strategy": multiteacher_strategy if teacher_models is not None else "single_teacher",
             }
             if adaptive_distill_info is not None:
                 best_state.update(adaptive_distill_info)
+            if multiteacher_info is not None:
+                best_state.update(multiteacher_info)
             patience_counter = 0
         else:
             patience_counter += 1
@@ -380,6 +501,8 @@ def train_one_model(
         "lambda_distill_effective": lambda_distill_effective,
         "adaptive_distill_strategy": adaptive_distill_strategy,
         "teacher_model": teacher_model,
+        "teacher_models": teacher_models,
+        "multiteacher_strategy": multiteacher_strategy if teacher_models is not None else "single_teacher",
         "best_epoch": best_epoch,
         "best_metric": float(best_metric),
         "valid_roc_auc": np.nan,
@@ -396,6 +519,8 @@ def train_one_model(
     metrics.update({f"test_{k}": float(v) for k, v in test_metrics.items()})
     if adaptive_distill_info is not None:
         metrics.update(adaptive_distill_info)
+    if multiteacher_info is not None:
+        metrics.update(multiteacher_info)
 
     best_state["valid_metrics"] = valid_metrics
     best_state["test_metrics"] = test_metrics
@@ -426,6 +551,12 @@ def parse_args():
     parser.add_argument("--results-root", default=str(RESULTS_ROOT))
     parser.add_argument("--teacher-root", default=None)
     parser.add_argument("--teacher-model", default=None)
+    parser.add_argument("--teacher-models", nargs="+", default=None)
+    parser.add_argument(
+        "--multiteacher-strategy",
+        choices=["uniform", "validation_weighted", "top1_validation"],
+        default="uniform",
+    )
     parser.add_argument("--lambda-distill", type=float, default=0.0)
     parser.add_argument(
         "--adaptive-distill-strategy",
@@ -438,6 +569,13 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    if args.teacher_model is not None and args.teacher_models is not None:
+        raise ValueError("Use either --teacher-model or --teacher-models, not both")
+    if args.teacher_models is not None and args.adaptive_distill_strategy != "none":
+        raise ValueError(
+            "Adaptive single-teacher distillation does not support --teacher-models yet"
+        )
 
     selected_datasets = {name: DATASETS[name] for name in args.datasets}
 
@@ -466,6 +604,8 @@ def main():
                         lambda_transfer=args.lambda_transfer,
                         teacher_root=args.teacher_root,
                         teacher_model=args.teacher_model,
+                        teacher_models=args.teacher_models,
+                        multiteacher_strategy=args.multiteacher_strategy,
                         lambda_distill=args.lambda_distill,
                         adaptive_distill_strategy=args.adaptive_distill_strategy,
                         adaptive_base_results_root=args.adaptive_base_results_root,
