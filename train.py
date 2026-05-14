@@ -128,6 +128,42 @@ def build_multiteacher_weights(
     return torch.tensor(weights, dtype=torch.float32, device=DEVICE), info
 
 
+def build_batch_teacher_weights(
+    strategy,
+    teacher_uncertainty,
+    global_teacher_weights=None,
+):
+    if teacher_uncertainty is None:
+        raise ValueError(f"{strategy} requires teacher uncertainty inputs")
+
+    uncertainty = teacher_uncertainty.to(DEVICE)
+    if uncertainty.ndim != 2:
+        raise ValueError(
+            f"Expected teacher_uncertainty to have shape [batch, teachers], got {uncertainty.shape}"
+        )
+
+    finite_mask = torch.isfinite(uncertainty)
+    if not finite_mask.any():
+        raise ValueError(f"{strategy} requires at least one finite teacher uncertainty")
+
+    fallback = torch.where(
+        finite_mask,
+        uncertainty,
+        torch.full_like(uncertainty, float("inf")),
+    ).amin(dim=1, keepdim=True)
+    uncertainty = torch.where(finite_mask, uncertainty, fallback + 1.0)
+
+    scores = -uncertainty
+    if strategy == "uncertainty_validation_prior":
+        if global_teacher_weights is None:
+            raise ValueError("uncertainty_validation_prior requires global teacher weights")
+        scores = scores + torch.log(global_teacher_weights.clamp_min(1e-8)).view(1, -1)
+    elif strategy != "uncertainty_only":
+        raise ValueError(f"Unknown sample-level multiteacher strategy: {strategy}")
+
+    return torch.softmax(scores, dim=1)
+
+
 def resolve_lambda_distill(
     lambda_distill,
     adaptive_distill_strategy,
@@ -242,14 +278,27 @@ def compute_total_loss(
             for idx in range(teacher_pred.shape[1]):
                 teacher_target = teacher_pred[:, idx].view_as(pred)
                 if task_type == "classification":
-                    teacher_loss = F.binary_cross_entropy_with_logits(pred, teacher_target)
+                    teacher_loss = F.binary_cross_entropy_with_logits(
+                        pred,
+                        teacher_target,
+                        reduction="none",
+                    ).view(pred.shape[0], -1).mean(dim=1)
                 elif task_type == "regression":
-                    teacher_loss = nn.MSELoss()(pred, teacher_target)
+                    teacher_loss = F.mse_loss(
+                        pred,
+                        teacher_target,
+                        reduction="none",
+                    ).view(pred.shape[0], -1).mean(dim=1)
                 else:
                     raise ValueError(f"Unknown task_type: {task_type}")
                 per_teacher_losses.append(teacher_loss)
-            per_teacher_losses = torch.stack(per_teacher_losses)
-            distill_loss = torch.sum(per_teacher_losses * teacher_weights)
+            per_teacher_losses = torch.stack(per_teacher_losses, dim=1)
+            if teacher_weights.ndim == 1:
+                distill_loss = torch.sum(per_teacher_losses * teacher_weights.view(1, -1), dim=1).mean()
+            elif teacher_weights.ndim == 2:
+                distill_loss = torch.sum(per_teacher_losses * teacher_weights, dim=1).mean()
+            else:
+                raise ValueError(f"Unexpected teacher_weights shape: {teacher_weights.shape}")
         elif task_type == "classification":
             distill_loss = F.binary_cross_entropy_with_logits(pred, teacher_pred)
         elif task_type == "regression":
@@ -344,21 +393,32 @@ def train_one_model(
     dataset_cfg = DATASETS[dataset_name]
     higher_is_better = dataset_cfg["higher_is_better"]
     main_metric = dataset_cfg["main_metric"]
+    uses_sample_level_gate = multiteacher_strategy in {
+        "uncertainty_only",
+        "uncertainty_validation_prior",
+    }
     teacher_weights = None
     multiteacher_info = None
     if teacher_models is not None:
         if teacher_root is None:
             raise ValueError("--teacher-root is required when using --teacher-models")
+        global_weight_strategy = (
+            "validation_weighted"
+            if multiteacher_strategy == "uncertainty_validation_prior"
+            else "uniform" if multiteacher_strategy == "uncertainty_only" else multiteacher_strategy
+        )
         teacher_weights, multiteacher_info = build_multiteacher_weights(
             teacher_root=teacher_root,
             teacher_models=teacher_models,
-            strategy=multiteacher_strategy,
+            strategy=global_weight_strategy,
             dataset_name=dataset_name,
             train_ratio_tag=train_ratio_tag,
             seed=seed,
             main_metric=main_metric,
             higher_is_better=higher_is_better,
         )
+        if uses_sample_level_gate and multiteacher_info is not None:
+            multiteacher_info["sample_level_gate"] = multiteacher_strategy
     lambda_distill_effective, adaptive_distill_info = resolve_lambda_distill(
         lambda_distill=lambda_distill,
         adaptive_distill_strategy=adaptive_distill_strategy,
@@ -407,8 +467,16 @@ def train_one_model(
             desc = batch["desc"].to(DEVICE)
             y = batch["y"].to(DEVICE)
             teacher_pred = batch.get("teacher_pred")
+            teacher_uncertainty = batch.get("teacher_uncertainty")
             if teacher_pred is not None:
                 teacher_pred = teacher_pred.to(DEVICE)
+            batch_teacher_weights = teacher_weights
+            if uses_sample_level_gate:
+                batch_teacher_weights = build_batch_teacher_weights(
+                    strategy=multiteacher_strategy,
+                    teacher_uncertainty=teacher_uncertainty,
+                    global_teacher_weights=teacher_weights,
+                )
 
             optimizer.zero_grad()
             outputs = model(fp, desc)
@@ -420,7 +488,7 @@ def train_one_model(
                 model_name=model_name,
                 lambda_transfer=lambda_transfer,
                 teacher_pred=teacher_pred,
-                teacher_weights=teacher_weights,
+                teacher_weights=batch_teacher_weights,
                 lambda_distill=lambda_distill_effective,
             )
             total_loss.backward()
@@ -554,7 +622,13 @@ def parse_args():
     parser.add_argument("--teacher-models", nargs="+", default=None)
     parser.add_argument(
         "--multiteacher-strategy",
-        choices=["uniform", "validation_weighted", "top1_validation"],
+        choices=[
+            "uniform",
+            "validation_weighted",
+            "top1_validation",
+            "uncertainty_only",
+            "uncertainty_validation_prior",
+        ],
         default="uniform",
     )
     parser.add_argument("--lambda-distill", type=float, default=0.0)
