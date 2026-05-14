@@ -1,4 +1,4 @@
-# Reliability-Gated Conflict-Aware Multi-Teacher Distillation for Low-Resource ADMET Prediction
+# Pretrained Teacher Selection for Reliable Multi-Teacher Distillation in Low-Resource ADMET
 
 ## Abstract
 
@@ -10,7 +10,7 @@ Must include:
 - low-resource regression ADMET motivation;
 - ECFP-only inference constraint;
 - fixed distillation and naive adaptive weighting limitations from the pilot;
-- reliability-gated conflict-aware multi-teacher distillation;
+- pretrained teacher selection plus frozen routing distillation;
 - main RMSE result;
 - mechanism analysis result.
 
@@ -34,24 +34,24 @@ adaptive weighting underperforms fixed strong distillation. This suggests that
 the unresolved problem is not whether teacher knowledge can help, but when a
 student should trust each teacher.
 
-This paper studies teacher reliability in low-resource ADMET distillation. We
-ask: **when should an ECFP-only student trust each molecular teacher, and how
-should it learn when teachers disagree?** We propose Reliability-Gated
-Conflict-Aware Multi-Teacher Distillation, which trains an ECFP-only
-AdapterFusion student from multiple RF/XGB molecular teachers while estimating
-teacher reliability at the task and sample levels.
+This paper studies teacher selection in low-resource ADMET distillation. We
+ask: **how can an ECFP-only student learn which molecular teacher to trust
+under low-resource supervision, and why do jointly learned routing gates
+underperform?** We propose a two-stage method that first trains a standalone
+teacher selector from cross-fit pseudo-oracle labels and then freezes that
+selector to route teacher supervision into an ECFP-only AdapterFusion student.
 
 Contributions:
 
 1. We formulate ECFP-only low-resource ADMET prediction as a selective
    teacher-reliability distillation problem.
-2. We propose a reliability gate using validation quality, teacher
-   uncertainty, teacher agreement, teacher-student disagreement, and
-   descriptor-space coverage.
-3. We introduce conflict-aware top-k distillation to avoid harmful averaging
-   when teachers disagree.
+2. We show that oracle best-teacher labels are predictable from teacher
+   uncertainty, consensus deviation, validation priors, and descriptor-space
+   coverage, while jointly learned routing gates remain unstable.
+3. We propose cross-fit selector pretraining plus frozen top-1 routing, with
+   selector-based filtering as a simplified companion variant.
 4. We evaluate the method on regression ADMET datasets and analyze which
-   teachers are trusted across endpoints, train ratios, and chemical regions.
+   teachers are selected across endpoints, train ratios, and chemical regions.
 
 ## 2. Problem Formulation
 
@@ -72,16 +72,16 @@ produces:
 \]
 
 The goal is not to average teacher predictions uniformly. Instead, the student
-learns a sample-level teacher weight:
+uses a learned teacher selector:
 
 \[
-w_i(x)=g(r_i(x), \kappa(x)),
+\pi(x)=h_\phi(r(x)),
 \]
 
-where \(r_i(x)\) contains reliability features for teacher \(T_i\), and
-\(\kappa(x)\) measures teacher conflict. The training objective uses teacher
-knowledge only when it is estimated to be reliable, while keeping inference
-ECFP-only.
+where \(r(x)\) contains teacher-selection features derived from teacher
+uncertainty, consensus deviation, validation priors, and OOD coverage. The
+selector is trained first, then frozen, and finally used to route teacher
+distillation while keeping inference ECFP-only.
 
 ## 3. Method
 
@@ -115,9 +115,9 @@ The first version uses reproducible RF/XGB teachers:
 These teachers represent different molecular views and modeling biases.
 Chemprop is deferred until the RF/XGB reliability pipeline is established.
 
-### 3.3 Reliability Features
+### 3.3 Teacher-Selection Features
 
-For teacher \(T_i\), reliability is estimated from:
+For teacher \(T_i\), teacher selection is estimated from:
 
 - validation quality \(q_i\);
 - teacher uncertainty \(u_i(x)\);
@@ -125,35 +125,39 @@ For teacher \(T_i\), reliability is estimated from:
 - teacher-student disagreement \(\delta_i(x)\);
 - descriptor-space OOD score \(o(x)\).
 
-The initial transparent reliability score is:
+### 3.4 Cross-Fit Selector Pretraining
+
+Within each dataset-ratio-seed training split, teachers are re-fit in
+cross-validation folds to generate out-of-fold train predictions. The
+pseudo-oracle selector label is the teacher with minimum absolute error on each
+held-out train sample:
 
 \[
-R_i(x)=
-\alpha \tilde{q}_i
--\beta \tilde{u}_i(x)
-+\eta \tilde{a}_i(x)
--\gamma \tilde{\delta}_i(x)
--\rho \tilde{o}(x).
+y^{sel}(x)=\arg\min_i |\hat{y}_i(x)-y|.
 \]
 
-Teacher weights are then:
+A selector \(h_\phi\) is trained on these labels. The first formal version uses
+a random-forest selector, with logistic regression as a lighter baseline.
+
+### 3.5 Frozen Routing Distillation
+
+After selector pretraining, the selector is frozen. For each training sample,
+it outputs either:
+
+- a top-1 teacher for hard routing; or
+- a filtered teacher subset for simplified multi-teacher distillation.
+
+The main version uses hard top-1 routing:
 
 \[
-w_i(x)=\mathrm{softmax}_i(R_i(x)).
+i^*(x)=\arg\max_i h_\phi(r(x))_i,
+\qquad
+\mathcal{L}_{distill}=
+\mathrm{Huber}(\hat{y}_S,\hat{y}_{i^*(x)}).
 \]
 
-### 3.4 Conflict-Aware Top-k Distillation
-
-Teacher conflict is measured by prediction variance:
-
-\[
-\kappa(x)=\mathrm{Var}_i(\hat{y}_i).
-\]
-
-If conflict is low, the student distills from all teachers using reliability
-weights. If conflict is high, the student distills only from the top-k most
-reliable teachers. This prevents a poor or out-of-domain teacher from dragging
-the target toward an unhelpful average.
+The simplified filtering version keeps only trusted teachers and applies
+validation-weighted distillation on the surviving subset.
 
 ### 3.5 Training Objective
 
@@ -195,9 +199,10 @@ Student baselines:
 
 - base AdapterFusion;
 - fixed `ECFP4_Desc_RF` distillation with `lambda_distill=1.0`;
-- uniform multi-teacher distillation;
-- validation-weighted multi-teacher distillation;
-- top-1 validation teacher distillation.
+   - uniform multi-teacher distillation;
+   - validation-weighted multi-teacher distillation;
+   - top-1 validation teacher distillation;
+   - jointly learned soft/hard routing gates.
 
 Descriptor-access controls:
 
@@ -212,9 +217,9 @@ Descriptor-access controls:
 
 Compare:
 
-- reliability-gated multi-teacher distillation;
-- reliability-gated conflict-aware top-k distillation;
-- Huber vs MSE distillation loss.
+- pretrained selector hard top-1 routing;
+- pretrained selector top-2 routing;
+- selector-filtered validation-weighted distillation.
 
 ### 4.4 Evaluation Questions
 
@@ -271,4 +276,3 @@ Planned limitations:
 - RF/XGB teachers are not the full space of molecular teachers;
 - reliability features are partly hand-designed in the first version;
 - student may still underperform descriptor-access teachers.
-

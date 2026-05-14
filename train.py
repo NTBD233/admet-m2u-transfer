@@ -191,10 +191,44 @@ def build_batch_teacher_weights(
     strategy,
     teacher_uncertainty,
     teacher_pred,
+    selector_probs=None,
     student_pred=None,
     global_teacher_weights=None,
     gate_module=None,
 ):
+    if strategy in {
+        "pretrained_selector_top1",
+        "pretrained_selector_top2",
+        "selector_filtered_uniform",
+        "selector_filtered_validation_weighted",
+    }:
+        if selector_probs is None:
+            raise ValueError(f"{strategy} requires selector probabilities")
+        selector_probs = selector_probs.to(DEVICE)
+        if selector_probs.ndim != 2:
+            raise ValueError(f"Expected selector_probs to have shape [batch, teachers], got {selector_probs.shape}")
+        if strategy == "pretrained_selector_top1":
+            top1_idx = torch.argmax(selector_probs, dim=1, keepdim=True)
+            weights = torch.zeros_like(selector_probs)
+            weights.scatter_(1, top1_idx, 1.0)
+            return weights
+        if strategy == "pretrained_selector_top2":
+            top2_idx = torch.topk(selector_probs, k=min(2, selector_probs.shape[1]), dim=1).indices
+            weights = torch.zeros_like(selector_probs)
+            weights.scatter_(1, top2_idx, 1.0)
+            weights = selector_probs * weights
+            return weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-8)
+
+        threshold = 1.0 / selector_probs.shape[1]
+        mask = selector_probs >= threshold
+        if strategy == "selector_filtered_uniform":
+            weights = mask.float()
+            return weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-8)
+        if global_teacher_weights is None:
+            raise ValueError("selector_filtered_validation_weighted requires global teacher weights")
+        weights = mask.float() * global_teacher_weights.view(1, -1)
+        return weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-8)
+
     if teacher_uncertainty is None:
         raise ValueError(f"{strategy} requires teacher uncertainty inputs")
     if teacher_pred is None:
@@ -489,6 +523,8 @@ def train_one_model(
     teacher_root=None,
     teacher_model=None,
     teacher_models=None,
+    selector_root=None,
+    selector_model_name=None,
     multiteacher_strategy="uniform",
     lambda_distill=0.0,
     lambda_gate_supervision=0.0,
@@ -517,6 +553,8 @@ def train_one_model(
         teacher_root=teacher_root,
         teacher_model=teacher_model,
         teacher_models=teacher_models,
+        selector_root=selector_root,
+        selector_model_name=selector_model_name,
         seed=seed,
     )
 
@@ -537,6 +575,10 @@ def train_one_model(
         "learned_prior_residual_gate",
         "supervised_hard_top1_gate",
         "supervised_hard_top2_gate",
+        "pretrained_selector_top1",
+        "pretrained_selector_top2",
+        "selector_filtered_uniform",
+        "selector_filtered_validation_weighted",
     }
     teacher_weights = None
     multiteacher_info = None
@@ -555,12 +597,16 @@ def train_one_model(
                 "learned_prior_residual_gate",
                 "supervised_hard_top1_gate",
                 "supervised_hard_top2_gate",
+                "pretrained_selector_top1",
+                "pretrained_selector_top2",
+                "selector_filtered_validation_weighted",
             }
             else "uniform"
             if multiteacher_strategy in {
                 "uncertainty_only",
                 "uncertainty_teacher_disagreement",
                 "uncertainty_teacher_student",
+                "selector_filtered_uniform",
             }
             else multiteacher_strategy
         )
@@ -640,6 +686,7 @@ def train_one_model(
             y = batch["y"].to(DEVICE)
             teacher_pred = batch.get("teacher_pred")
             teacher_uncertainty = batch.get("teacher_uncertainty")
+            selector_probs = batch.get("selector_probs")
             if teacher_pred is not None:
                 teacher_pred = teacher_pred.to(DEVICE)
             batch_teacher_weights = teacher_weights
@@ -649,6 +696,7 @@ def train_one_model(
                     strategy=multiteacher_strategy,
                     teacher_uncertainty=teacher_uncertainty,
                     teacher_pred=teacher_pred,
+                    selector_probs=selector_probs,
                     student_pred=outputs["pred"].detach().view(-1),
                     global_teacher_weights=teacher_weights,
                     gate_module=gate_module,
@@ -738,6 +786,7 @@ def train_one_model(
                 "adaptive_distill_strategy": adaptive_distill_strategy,
                 "teacher_model": teacher_model,
                 "teacher_models": teacher_models,
+                "selector_model_name": selector_model_name,
                 "multiteacher_strategy": multiteacher_strategy if teacher_models is not None else "single_teacher",
             }
             if adaptive_distill_info is not None:
@@ -771,6 +820,7 @@ def train_one_model(
         "adaptive_distill_strategy": adaptive_distill_strategy,
         "teacher_model": teacher_model,
         "teacher_models": teacher_models,
+        "selector_model_name": selector_model_name,
         "multiteacher_strategy": multiteacher_strategy if teacher_models is not None else "single_teacher",
         "best_epoch": best_epoch,
         "best_metric": float(best_metric),
@@ -821,6 +871,8 @@ def parse_args():
     parser.add_argument("--teacher-root", default=None)
     parser.add_argument("--teacher-model", default=None)
     parser.add_argument("--teacher-models", nargs="+", default=None)
+    parser.add_argument("--selector-root", default=None)
+    parser.add_argument("--selector-model-name", default=None)
     parser.add_argument(
         "--multiteacher-strategy",
         choices=[
@@ -838,6 +890,10 @@ def parse_args():
             "learned_prior_residual_gate",
             "supervised_hard_top1_gate",
             "supervised_hard_top2_gate",
+            "pretrained_selector_top1",
+            "pretrained_selector_top2",
+            "selector_filtered_uniform",
+            "selector_filtered_validation_weighted",
         ],
         default="uniform",
     )
@@ -861,6 +917,19 @@ def main():
         raise ValueError(
             "Adaptive single-teacher distillation does not support --teacher-models yet"
         )
+    selector_strategies = {
+        "pretrained_selector_top1",
+        "pretrained_selector_top2",
+        "selector_filtered_uniform",
+        "selector_filtered_validation_weighted",
+    }
+    if args.multiteacher_strategy in selector_strategies:
+        if args.teacher_models is None:
+            raise ValueError(f"{args.multiteacher_strategy} requires --teacher-models")
+        if args.selector_root is None or args.selector_model_name is None:
+            raise ValueError(
+                f"{args.multiteacher_strategy} requires --selector-root and --selector-model-name"
+            )
 
     selected_datasets = {name: DATASETS[name] for name in args.datasets}
 
@@ -890,6 +959,8 @@ def main():
                         teacher_root=args.teacher_root,
                         teacher_model=args.teacher_model,
                         teacher_models=args.teacher_models,
+                        selector_root=args.selector_root,
+                        selector_model_name=args.selector_model_name,
                         multiteacher_strategy=args.multiteacher_strategy,
                         lambda_distill=args.lambda_distill,
                         lambda_gate_supervision=args.lambda_gate_supervision,

@@ -152,42 +152,25 @@ Purpose:
 
 - prove that the proposed method is not just benefiting from more teachers.
 
-## Stage 3: Main Method
+## Stage 3: Selector Pretraining And Frozen Routing
 
 Train:
 
-- reliability-gated multi-teacher AdapterFusion;
-- conflict-aware top-k version;
-- Huber distillation loss default;
-- MSE distillation loss ablation.
+- cross-fit train pseudo-oracle selector;
+- frozen selector hard top-1 routing;
+- frozen selector top-2 routing;
+- selector-filtered validation-weighted distillation.
 
-Default reliability score:
+Selector supervision:
 
-\[
-R_i(x)=
-\alpha \tilde{q}_i
--\beta \tilde{u}_i(x)
-+\eta \tilde{a}_i(x)
--\gamma \tilde{\delta}_i(x)
--\rho \tilde{o}(x)
-\]
+- train-split out-of-fold teacher predictions
+- pseudo-oracle label = minimum absolute teacher error on held-out train sample
 
-Teacher weights:
+Routing modes:
 
-\[
-w_i(x)=\mathrm{softmax}_i(R_i(x)).
-\]
-
-Conflict score:
-
-\[
-\kappa(x)=\mathrm{Var}_i(\hat{y}_{T_i}(x)).
-\]
-
-Conflict handling:
-
-- low conflict: weighted all-teacher distillation;
-- high conflict: top-k distillation by reliability.
+- hard top-1 selector routing
+- top-2 routing with normalized selector probabilities
+- selector-based teacher filtering before validation-weighted distillation
 
 ## Main Comparison Table
 
@@ -203,8 +186,9 @@ Columns:
 - uniform multi-teacher;
 - validation-weighted multi-teacher;
 - top-1 validation teacher;
-- reliability-gated multi-teacher;
-- conflict-aware top-k reliability gate;
+- pretrained selector hard top-1 routing;
+- pretrained selector top-2 routing;
+- selector-filtered validation-weighted distillation;
 - `ECFP4_Desc_RF`;
 - `ECFP4_Desc_XGB`;
 - delta vs AdapterFusion;
@@ -214,10 +198,10 @@ Columns:
 
 Ablations:
 
-- no validation-quality prior;
-- no uncertainty;
-- no teacher agreement;
-- no teacher-student disagreement;
+- selector model: RF vs logistic;
+- routing mode: top-1 vs top-2 vs filtering;
+- selector training source: validation oracle prototype vs cross-fit pseudo-oracle;
+- joint gate vs frozen selector routing;
 - no descriptor-space OOD;
 - no conflict top-k;
 - MSE teacher loss instead of Huber;

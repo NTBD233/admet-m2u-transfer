@@ -8,7 +8,7 @@ from utils.config import BATCH_SIZE, FEATURE_ROOT, TRAIN_RATIO_TAG
 
 
 class M2UFeatureDataset(Dataset):
-    def __init__(self, npz_path, task_type, teacher_path=None, teacher_paths=None):
+    def __init__(self, npz_path, task_type, teacher_path=None, teacher_paths=None, selector_path=None):
         data = np.load(npz_path, allow_pickle=True)
 
         self.X_fp = torch.tensor(data["X_fp"], dtype=torch.float32)
@@ -18,6 +18,7 @@ class M2UFeatureDataset(Dataset):
         self.task_type = task_type
         self.teacher_pred = None
         self.teacher_uncertainty = None
+        self.selector_probs = None
         if teacher_path is not None:
             teacher_data = np.load(teacher_path, allow_pickle=True)
             self.teacher_pred = torch.tensor(
@@ -59,6 +60,17 @@ class M2UFeatureDataset(Dataset):
                 uncertainties.append(uncertainty)
             self.teacher_pred = torch.cat(preds, dim=1)
             self.teacher_uncertainty = torch.cat(uncertainties, dim=1)
+        if selector_path is not None:
+            selector_data = np.load(selector_path, allow_pickle=True)
+            self.selector_probs = torch.tensor(
+                selector_data["probs"],
+                dtype=torch.float32,
+            )
+            if len(self.selector_probs) != len(self.y):
+                raise ValueError(
+                    f"Selector predictions length mismatch for {selector_path}: "
+                    f"{len(self.selector_probs)} != {len(self.y)}"
+                )
 
     def __len__(self):
         return len(self.y)
@@ -74,6 +86,8 @@ class M2UFeatureDataset(Dataset):
             item["teacher_pred"] = self.teacher_pred[idx]
         if self.teacher_uncertainty is not None:
             item["teacher_uncertainty"] = self.teacher_uncertainty[idx]
+        if self.selector_probs is not None:
+            item["selector_probs"] = self.selector_probs[idx]
         return item
 
 
@@ -100,6 +114,8 @@ def make_loaders(
     teacher_root=None,
     teacher_model=None,
     teacher_models=None,
+    selector_root=None,
+    selector_model_name=None,
     seed=None,
 ):
     train_path, valid_path, test_path = feature_paths(
@@ -135,12 +151,25 @@ def make_loaders(
             if not teacher_path.exists():
                 raise FileNotFoundError(f"Missing teacher predictions: {teacher_path}")
             teacher_train_paths.append(teacher_path)
+    selector_train_path = None
+    if selector_root is not None and selector_model_name is not None and seed is not None:
+        selector_train_path = (
+            Path(selector_root)
+            / dataset_name
+            / selector_model_name
+            / f"train_{train_ratio_tag}"
+            / f"seed_{seed}"
+            / "train_selector_predictions.npz"
+        )
+        if not selector_train_path.exists():
+            raise FileNotFoundError(f"Missing selector predictions: {selector_train_path}")
 
     train_ds = M2UFeatureDataset(
         train_path,
         task_type,
         teacher_path=teacher_train_path,
         teacher_paths=teacher_train_paths,
+        selector_path=selector_train_path,
     )
     valid_ds = M2UFeatureDataset(valid_path, task_type)
     test_ds = M2UFeatureDataset(test_path, task_type)

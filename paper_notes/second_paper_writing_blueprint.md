@@ -2,19 +2,18 @@
 
 ## Working Title
 
-**Reliability-Gated Conflict-Aware Multi-Teacher Distillation for Low-Resource ADMET Prediction**
+**Pretrained Teacher Selection for Reliable Multi-Teacher Distillation in Low-Resource ADMET**
 
 Shorter alternatives:
 
 - **Selective Multi-Teacher Distillation for Low-Resource ADMET Prediction**
-- **Reliability-Guided Teacher Distillation for ECFP-Only ADMET Prediction**
+- **Supervised Teacher Selection for ECFP-Only ADMET Distillation**
 
 ## One-Sentence Thesis
 
 Low-resource ADMET students should not uniformly imitate every molecular
-teacher; an ECFP-only student can learn more reliable descriptor-informed
-knowledge when teacher supervision is selected by sample-level reliability and
-teacher-conflict signals.
+teacher; an ECFP-only student benefits more reliably when teacher selection is
+learned first and then used to route distillation into an ECFP-only student.
 
 ## Paper Type
 
@@ -30,24 +29,24 @@ The pilot manuscript provides motivation:
 
 The second paper's novelty is:
 
-> sample-level teacher reliability estimation plus conflict-aware
-> multi-teacher distillation under ECFP-only inference.
+> pretrained teacher selection plus frozen routing distillation under
+> ECFP-only inference.
 
 ## Core Research Question
 
 Use this exact question to anchor the introduction:
 
-> When should an ECFP-only ADMET student trust each molecular teacher, and how
-> should it learn when descriptor, fingerprint, and ensemble teachers disagree?
+> How can an ECFP-only ADMET student learn which molecular teacher to trust
+> under low-resource supervision, and why does direct joint routing fail?
 
 ## Main Claim
 
 Target claim after experiments:
 
-> Reliability-gated conflict-aware multi-teacher distillation improves
-> ECFP-only AdapterFusion more consistently than fixed single-teacher
-> distillation, uniform multi-teacher averaging, and task-level teacher
-> weighting on low-resource regression ADMET tasks.
+> Pretrained teacher selection with frozen routing improves ECFP-only
+> AdapterFusion more consistently than fixed single-teacher distillation,
+> uniform multi-teacher averaging, task-level teacher weighting, and jointly
+> learned routing gates on low-resource regression ADMET tasks.
 
 Controlled limitation:
 
@@ -61,19 +60,20 @@ Low-resource ADMET prediction benefits from inexpensive molecular knowledge
 such as fingerprints and physicochemical descriptors, but a deployed predictor
 may need to remain lightweight and ECFP-only. Prior descriptor-teacher
 distillation improves ECFP-only students in some regression ADMET settings, yet
-fixed distillation weights are unstable and naive adaptive weighting can
-suppress useful teacher supervision. We propose Reliability-Gated
-Conflict-Aware Multi-Teacher Distillation, which trains an ECFP-only
-AdapterFusion student using multiple molecular expert teachers while
-estimating teacher reliability at the task and sample levels. The gate combines
-validation quality, teacher uncertainty, teacher agreement,
-teacher-student disagreement, and descriptor-space coverage to weight
-teacher losses and avoid harmful averaging under teacher conflict. Across
+fixed distillation weights are unstable and naive adaptive or jointly learned
+gating can suppress useful teacher supervision. We propose Pretrained Teacher
+Selection for Multi-Teacher Distillation, which first trains a standalone
+teacher selector from cross-fit pseudo-oracle labels and then freezes the
+selector to route teacher supervision into an ECFP-only AdapterFusion student.
+The selector uses teacher uncertainty, teacher consensus deviation,
+validation-derived teacher priors, and descriptor-space coverage features to
+predict which molecular expert should supervise each sample. Across
 low-resource regression ADMET datasets, training ratios, and random seeds, the
 method is evaluated against base AdapterFusion, fixed single-teacher
-distillation, uniform multi-teacher distillation, and descriptor-access RF/XGB
-controls. The intended result is a more reliable ECFP-only transfer method and
-an analysis of when descriptor-informed teachers help or hurt.
+distillation, uniform multi-teacher distillation, task-level teacher selection,
+and jointly learned routing gates. The intended result is a more reliable
+ECFP-only transfer method and a sharper account of why teacher selection, not
+generic gating, is the central missing piece.
 
 Do not finalize the abstract until the diagnostics and main experiments are
 complete.
@@ -103,19 +103,18 @@ Write the introduction in this order:
    validation weighting underperforms fixed distillation.
 
 5. **New problem.**
-   The central issue is teacher reliability: not every teacher should be
-   trusted for every task or sample.
+   The central issue is not only teacher reliability, but how to obtain stable
+   supervision for teacher selection under low-resource ADMET.
 
 6. **Our method.**
-   Introduce reliability-gated conflict-aware multi-teacher distillation.
+   Introduce pretrained teacher selection plus frozen routing distillation.
 
 7. **Contributions.**
    Use four contribution bullets:
-   - formulate teacher reliability for ECFP-only low-resource ADMET;
-   - propose sample-level reliability gating using validation, uncertainty,
-     agreement, disagreement, and OOD signals;
-   - add conflict-aware top-k teacher selection to avoid harmful averaging;
-   - provide regression ADMET experiments and mechanism analyses.
+   - formulate low-resource ECFP-only ADMET transfer as a teacher-selection problem;
+   - show that oracle best-teacher labels are predictable while joint routing fails;
+   - propose cross-fit selector pretraining plus frozen top-1 routing;
+   - provide filtering/routing ablations and mechanism analyses.
 
 ### 2. Problem Formulation
 
@@ -404,4 +403,3 @@ uncertainty/OOD-weighted distillation.
 - "multi-teacher is always better"
 - "adaptive weighting works" unless the new gate actually supports it
 - "the student replaces descriptor-access RF/XGB"
-

@@ -2,7 +2,7 @@
 
 ## Working Title
 
-**Selective Multi-Teacher Descriptor Distillation for Low-Resource ADMET Prediction**
+**Pretrained Teacher Selection for Reliable Multi-Teacher Distillation in Low-Resource ADMET**
 
 ## Starting Point From The Pilot Paper
 
@@ -26,14 +26,14 @@ The high-venue version should therefore not be framed as "more baselines" or
 
 ## Core Claim To Build Toward
 
-The intended contribution is selective teacher reliability, not simply
-multi-teacher distillation.
+The intended contribution is no longer generic gating. The stronger claim is
+that teacher selection supervision is the missing ingredient.
 
 Proposed high-venue claim:
 
 > A student with ECFP-only inference can benefit more reliably from
-> descriptor-informed molecular experts when distillation is gated by
-> task-level and sample-level teacher reliability.
+> descriptor-informed molecular experts when teacher selection is pretrained
+> from cross-fit pseudo-oracle signals and then frozen for routing.
 
 This keeps the inference constraint from the pilot paper while turning the
 pilot limitations into the new method.
@@ -178,7 +178,7 @@ The expected behavior is:
 - far samples: reduce teacher pressure unless teachers agree and uncertainty
   is low.
 
-## Gating Variants
+## Selector Variants
 
 ### Variant A: Fixed Multi-Teacher Average
 
@@ -204,57 +204,48 @@ w_i(d,r) = \mathrm{softmax}(\gamma q_i(d,r)).
 This is a conservative midpoint between global fixed lambda and sample-level
 gating.
 
-### Variant C: Rule-Based Sample Reliability Gate
+### Variant C: Pretrained Teacher Selector
 
-The first serious method candidate:
+Train a standalone selector on train-split cross-fit pseudo-oracle labels.
 
-\[
-w_i(x) =
-\mathrm{softmax}_i(
-\alpha \tilde{q}_i
-- \beta \tilde{u}_i(x)
-- \gamma \tilde{\delta}_i(x)
-+ \eta \tilde{a}_i(x)
-- \rho \tilde{o}(x)
-).
-\]
-
-Where:
-
-- \(\tilde{q}_i\): normalized validation reliability;
-- \(\tilde{u}_i(x)\): normalized teacher uncertainty;
-- \(\tilde{\delta}_i(x)\): normalized teacher-student disagreement;
-- \(\tilde{a}_i(x)\): normalized teacher agreement;
-- \(\tilde{o}(x)\): normalized out-of-domain score.
-
-Start with a small grid over \(\alpha,\beta,\gamma,\eta,\rho\). Keep this
-version deliberately simple and reproducible.
-
-### Variant D: Conflict-Aware Top-k Teacher Selection
-
-When teacher disagreement is high, avoid averaging all teachers:
+Label:
 
 \[
-i^*(x) = \arg\max_i R_i(x),
-\quad
-\mathcal{L}_{distill} =
-\ell(\hat{y}_{student}, \hat{y}_{T_{i^*}}).
+y^{sel}(x)=\arg\min_i |\hat{y}_{T_i}(x)-y|.
 \]
 
-Use top-1 or top-2 teachers only when the teacher-conflict score exceeds a
-threshold. Otherwise use the soft gate.
+Inputs:
 
-### Variant E: Learned Reliability Gate
+- per-teacher uncertainty
+- per-teacher consensus deviation
+- validation-prior teacher weights
+- descriptor-space OOD score
 
-Train a small MLP gate on reliability features. To avoid validation leakage:
+The first formal version should use:
 
-- split the training set into student-train and gate-calibration folds; or
-- use out-of-fold teacher predictions from cross-validation; or
-- train the gate only as a differentiable weighting function without fitting
-  to validation labels directly.
+- RF selector as the primary selector
+- logistic selector as a weak baseline
 
-This should be a second-stage method after rule-based gating proves there is
-signal.
+### Variant D: Frozen Top-1 Routing
+
+The main method candidate:
+
+\[
+i^*(x)=\arg\max_i h_\phi(r(x))_i,
+\qquad
+\mathcal{L}_{distill}=\ell(\hat{y}_{student}, \hat{y}_{T_{i^*}(x)}).
+\]
+
+The selector is pretrained first, then frozen during student training.
+
+### Variant E: Frozen Top-2 Routing / Selector Filtering
+
+Two companion variants:
+
+1. top-2 routing with normalized selector probabilities
+2. selector-based teacher filtering followed by validation-weighted distillation
+
+These should be secondary variants, not the main claim.
 
 ## Training Objective
 
@@ -517,4 +508,3 @@ Reason:
 - diagnostic tables are cheap compared with full student training;
 - the result will tell whether the high-venue method should be multi-teacher,
   single-teacher reliability-weighted, or stronger-student distillation.
-
