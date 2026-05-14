@@ -34,6 +34,49 @@ from utils.summary import collect_metrics, save_summaries
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+class TeacherReliabilityGate(nn.Module):
+    def __init__(self, input_dim=4, hidden_dim=16):
+        super().__init__()
+        self.scorer = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+        )
+
+    def forward(self, features):
+        logits = self.scorer(features).squeeze(-1)
+        return torch.softmax(logits, dim=1)
+
+
+class TeacherReliabilityLinearGate(nn.Module):
+    def __init__(self, input_dim=4):
+        super().__init__()
+        self.scorer = nn.Linear(input_dim, 1)
+
+    def forward(self, features):
+        logits = self.scorer(features).squeeze(-1)
+        return torch.softmax(logits, dim=1)
+
+
+class TeacherReliabilityPriorResidualGate(nn.Module):
+    def __init__(self, input_dim=4, hidden_dim=8, residual_scale=0.5):
+        super().__init__()
+        self.residual_scale = residual_scale
+        self.scorer = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+        )
+        nn.init.zeros_(self.scorer[-1].weight)
+        nn.init.zeros_(self.scorer[-1].bias)
+
+    def forward(self, features, prior_weights):
+        residual_logits = self.scorer(features).squeeze(-1)
+        residual_logits = self.residual_scale * torch.tanh(residual_logits)
+        prior_logits = torch.log(prior_weights.clamp_min(1e-8)).view(1, -1)
+        return torch.softmax(prior_logits + residual_logits, dim=1)
+
+
 def load_metric_from_json(path, metric):
     with Path(path).open("r", encoding="utf-8") as f:
         data = json.load(f)
@@ -134,6 +177,7 @@ def build_batch_teacher_weights(
     teacher_pred,
     student_pred=None,
     global_teacher_weights=None,
+    gate_module=None,
 ):
     if teacher_uncertainty is None:
         raise ValueError(f"{strategy} requires teacher uncertainty inputs")
@@ -169,6 +213,29 @@ def build_batch_teacher_weights(
     if student_pred is not None:
         student_disagreement = torch.abs(teacher_pred - student_pred.view(-1, 1))
 
+    if strategy in {
+        "learned_reliability_gate",
+        "learned_linear_gate",
+        "learned_prior_residual_gate",
+    }:
+        if student_disagreement is None:
+            raise ValueError(f"{strategy} requires student predictions")
+        if global_teacher_weights is None:
+            raise ValueError(f"{strategy} requires global teacher weights")
+        if gate_module is None:
+            raise ValueError(f"{strategy} requires a gate module")
+        gate_features = torch.stack(
+            [
+                uncertainty,
+                teacher_disagreement,
+                student_disagreement,
+                torch.log(global_teacher_weights.clamp_min(1e-8)).view(1, -1).expand_as(uncertainty),
+            ],
+            dim=-1,
+        )
+        if strategy == "learned_prior_residual_gate":
+            return gate_module(gate_features, global_teacher_weights)
+        return gate_module(gate_features)
     if strategy == "uncertainty_validation_prior":
         if global_teacher_weights is None:
             raise ValueError("uncertainty_validation_prior requires global teacher weights")
@@ -426,11 +493,6 @@ def train_one_model(
     )
 
     model = build_model(model_name).to(DEVICE)
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=LR,
-        weight_decay=WEIGHT_DECAY,
-    )
 
     dataset_cfg = DATASETS[dataset_name]
     higher_is_better = dataset_cfg["higher_is_better"]
@@ -442,9 +504,13 @@ def train_one_model(
         "uncertainty_teacher_student",
         "uncertainty_student_prior",
         "uncertainty_composite",
+        "learned_reliability_gate",
+        "learned_linear_gate",
+        "learned_prior_residual_gate",
     }
     teacher_weights = None
     multiteacher_info = None
+    gate_module = None
     if teacher_models is not None:
         if teacher_root is None:
             raise ValueError("--teacher-root is required when using --teacher-models")
@@ -454,6 +520,9 @@ def train_one_model(
                 "uncertainty_validation_prior",
                 "uncertainty_student_prior",
                 "uncertainty_composite",
+                "learned_reliability_gate",
+                "learned_linear_gate",
+                "learned_prior_residual_gate",
             }
             else "uniform"
             if multiteacher_strategy in {
@@ -475,6 +544,20 @@ def train_one_model(
         )
         if uses_sample_level_gate and multiteacher_info is not None:
             multiteacher_info["sample_level_gate"] = multiteacher_strategy
+    if multiteacher_strategy == "learned_reliability_gate":
+        gate_module = TeacherReliabilityGate().to(DEVICE)
+    elif multiteacher_strategy == "learned_linear_gate":
+        gate_module = TeacherReliabilityLinearGate().to(DEVICE)
+    elif multiteacher_strategy == "learned_prior_residual_gate":
+        gate_module = TeacherReliabilityPriorResidualGate().to(DEVICE)
+    optim_params = list(model.parameters())
+    if gate_module is not None:
+        optim_params.extend(gate_module.parameters())
+    optimizer = torch.optim.Adam(
+        optim_params,
+        lr=LR,
+        weight_decay=WEIGHT_DECAY,
+    )
     lambda_distill_effective, adaptive_distill_info = resolve_lambda_distill(
         lambda_distill=lambda_distill,
         adaptive_distill_strategy=adaptive_distill_strategy,
@@ -535,6 +618,7 @@ def train_one_model(
                     teacher_pred=teacher_pred,
                     student_pred=outputs["pred"].detach().view(-1),
                     global_teacher_weights=teacher_weights,
+                    gate_module=gate_module,
                 )
 
             optimizer.zero_grad()
@@ -586,6 +670,7 @@ def train_one_model(
             best_epoch = epoch
             best_state = {
                 "model_state_dict": copy.deepcopy(model.state_dict()),
+                "gate_state_dict": copy.deepcopy(gate_module.state_dict()) if gate_module is not None else None,
                 "best_epoch": best_epoch,
                 "best_metric": float(best_metric),
                 "dataset": dataset_name,
@@ -613,6 +698,8 @@ def train_one_model(
             break
 
     model.load_state_dict(best_state["model_state_dict"])
+    if gate_module is not None and best_state.get("gate_state_dict") is not None:
+        gate_module.load_state_dict(best_state["gate_state_dict"])
     valid_metrics, valid_pred_df = evaluate_model(model, valid_loader, task_type)
     test_metrics, test_pred_df = evaluate_model(model, test_loader, task_type)
 
@@ -690,6 +777,9 @@ def parse_args():
             "uncertainty_teacher_student",
             "uncertainty_student_prior",
             "uncertainty_composite",
+            "learned_reliability_gate",
+            "learned_linear_gate",
+            "learned_prior_residual_gate",
         ],
         default="uniform",
     )

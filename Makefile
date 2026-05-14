@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PYTHON ?= python
 
-.PHONY: setup prepare features smoke train train-low-resource ml-baselines lambda-ablation analysis paper-tables summary teacher-predictions-regression teacher-predictions-multiteacher teacher-reliability multiteacher-uniform-smoke multiteacher-validation-smoke multiteacher-top1-smoke multiteacher-uncertainty-smoke multiteacher-uncertainty-prior-smoke multiteacher-uncertainty-disagreement-smoke multiteacher-uncertainty-student-smoke multiteacher-uncertainty-student-prior-smoke multiteacher-uncertainty-composite-smoke distill-regression distill-regression-summary distill-lambda-sweep distill-lambda-summary distill-lambda-analysis distill-adaptive-smoke distill-adaptive-regression distill-adaptive-summary
+.PHONY: setup prepare features smoke train train-low-resource ml-baselines lambda-ablation analysis paper-tables summary teacher-predictions-regression teacher-predictions-multiteacher teacher-reliability multiteacher-uniform-smoke multiteacher-validation-smoke multiteacher-top1-smoke multiteacher-uncertainty-smoke multiteacher-uncertainty-prior-smoke multiteacher-uncertainty-disagreement-smoke multiteacher-uncertainty-student-smoke multiteacher-uncertainty-student-prior-smoke multiteacher-uncertainty-composite-smoke multiteacher-learned-gate-smoke multiteacher-learned-linear-gate-smoke multiteacher-learned-prior-residual-smoke distill-regression distill-regression-summary distill-lambda-sweep distill-lambda-summary distill-lambda-analysis distill-adaptive-smoke distill-adaptive-regression distill-adaptive-summary
 
 setup:
 	bash setup_env.sh
@@ -74,6 +74,15 @@ multiteacher-uncertainty-student-prior-smoke:
 
 multiteacher-uncertainty-composite-smoke:
 	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy uncertainty_composite --lambda-distill 1.0 --results-root results_multiteacher_uncertainty_composite_smoke
+
+multiteacher-learned-gate-smoke:
+	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy learned_reliability_gate --lambda-distill 1.0 --results-root results_multiteacher_learned_gate_smoke
+
+multiteacher-learned-linear-gate-smoke:
+	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy learned_linear_gate --lambda-distill 1.0 --results-root results_multiteacher_learned_linear_gate_smoke
+
+multiteacher-learned-prior-residual-smoke:
+	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy learned_prior_residual_gate --lambda-distill 1.0 --results-root results_multiteacher_learned_prior_residual_smoke
 
 distill-regression:
 	$(PYTHON) train.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-model ECFP4_Desc_RF --lambda-distill 0.1 --results-root results_distill_regression --skip-existing
