@@ -77,6 +77,22 @@ class TeacherReliabilityPriorResidualGate(nn.Module):
         return torch.softmax(prior_logits + residual_logits, dim=1)
 
 
+def straight_through_topk_weights(soft_weights, k=1):
+    if soft_weights.ndim != 2:
+        raise ValueError(f"Expected soft_weights to have shape [batch, teachers], got {soft_weights.shape}")
+    if k <= 0:
+        raise ValueError(f"k must be positive, got {k}")
+    n_teachers = soft_weights.shape[1]
+    k = min(k, n_teachers)
+    topk_idx = torch.topk(soft_weights, k=k, dim=1).indices
+    hard = torch.zeros_like(soft_weights)
+    hard.scatter_(1, topk_idx, 1.0)
+    if k > 1:
+        masked_soft = soft_weights * hard
+        hard = masked_soft / masked_soft.sum(dim=1, keepdim=True).clamp_min(1e-8)
+    return hard - soft_weights.detach() + soft_weights
+
+
 def load_metric_from_json(path, metric):
     with Path(path).open("r", encoding="utf-8") as f:
         data = json.load(f)
@@ -217,6 +233,8 @@ def build_batch_teacher_weights(
         "learned_reliability_gate",
         "learned_linear_gate",
         "learned_prior_residual_gate",
+        "supervised_hard_top1_gate",
+        "supervised_hard_top2_gate",
     }:
         if student_disagreement is None:
             raise ValueError(f"{strategy} requires student predictions")
@@ -233,8 +251,17 @@ def build_batch_teacher_weights(
             ],
             dim=-1,
         )
-        if strategy == "learned_prior_residual_gate":
-            return gate_module(gate_features, global_teacher_weights)
+        if strategy in {
+            "learned_prior_residual_gate",
+            "supervised_hard_top1_gate",
+            "supervised_hard_top2_gate",
+        }:
+            soft_weights = gate_module(gate_features, global_teacher_weights)
+            if strategy == "supervised_hard_top1_gate":
+                return straight_through_topk_weights(soft_weights, k=1)
+            if strategy == "supervised_hard_top2_gate":
+                return straight_through_topk_weights(soft_weights, k=2)
+            return soft_weights
         return gate_module(gate_features)
     if strategy == "uncertainty_validation_prior":
         if global_teacher_weights is None:
@@ -508,6 +535,8 @@ def train_one_model(
         "learned_reliability_gate",
         "learned_linear_gate",
         "learned_prior_residual_gate",
+        "supervised_hard_top1_gate",
+        "supervised_hard_top2_gate",
     }
     teacher_weights = None
     multiteacher_info = None
@@ -524,6 +553,8 @@ def train_one_model(
                 "learned_reliability_gate",
                 "learned_linear_gate",
                 "learned_prior_residual_gate",
+                "supervised_hard_top1_gate",
+                "supervised_hard_top2_gate",
             }
             else "uniform"
             if multiteacher_strategy in {
@@ -549,7 +580,7 @@ def train_one_model(
         gate_module = TeacherReliabilityGate().to(DEVICE)
     elif multiteacher_strategy == "learned_linear_gate":
         gate_module = TeacherReliabilityLinearGate().to(DEVICE)
-    elif multiteacher_strategy == "learned_prior_residual_gate":
+    elif multiteacher_strategy in {"learned_prior_residual_gate", "supervised_hard_top1_gate", "supervised_hard_top2_gate"}:
         gate_module = TeacherReliabilityPriorResidualGate().to(DEVICE)
     optim_params = list(model.parameters())
     if gate_module is not None:
@@ -805,6 +836,8 @@ def parse_args():
             "learned_reliability_gate",
             "learned_linear_gate",
             "learned_prior_residual_gate",
+            "supervised_hard_top1_gate",
+            "supervised_hard_top2_gate",
         ],
         default="uniform",
     )

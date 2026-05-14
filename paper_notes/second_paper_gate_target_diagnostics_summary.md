@@ -106,6 +106,40 @@ That narrows the real research problem:
 2. but directly adding a train-time gate classification loss is not enough to improve student regression
 3. therefore the missing piece is probably the **coupling between gate supervision and distillation target formation**, not simply gate predictability
 
+## Hard Top-1 Follow-Up
+
+Since Stage 2 already showed that `top1_validation` is the strongest simple
+baseline, the next minimal test was to replace soft teacher weighting with a
+supervised **hard top-1 gate** using straight-through one-hot routing.
+
+Smoke setting:
+
+- dataset: `caco2_wang`
+- train ratio: `10`
+- seed: `42`
+- strategy: `supervised_hard_top1_gate`
+- `lambda_distill = 1.0`
+
+Results:
+
+| method | valid RMSE | test RMSE |
+| --- | ---: | ---: |
+| `top1_validation` | `1.5979` | `1.7255` |
+| `supervised_prior_residual_gate` | `1.7143` | `1.8844` |
+| `supervised_hard_top1_gate` (`lambda_gate_supervision = 0.5`) | `1.6593` | `1.8192` |
+| `supervised_hard_top1_gate` (`lambda_gate_supervision = 0.1`) | `1.6593` | `1.8192` |
+
+Interpretation:
+
+1. hard top-1 routing is clearly better than the previous soft supervised gate
+2. but it still does not beat the simple `top1_validation` selector
+3. changing the gate-supervision weight from `0.5` to `0.1` does not materially change this smoke result
+
+This further supports the view that the main problem is not the loss weight.
+The likely bottleneck is that **jointly learning the selector and student from
+scratch** is still too unstable or too weakly coupled to the actual best
+teacher-choice objective.
+
 ## Next Method Direction
 
 The next serious method should likely move away from soft weighting alone and
@@ -113,7 +147,7 @@ toward one of these:
 
 1. **hard top-1 / top-2 teacher selection**
    - closer to the diagnostic oracle target
-   - more consistent with Stage 2 where `top1_validation` is already strong
+   - but likely after separate selector pretraining rather than pure joint training
 
 2. **teacher-selection pretraining plus frozen/warm-start gate**
    - first train the selector on oracle pseudo-labels
