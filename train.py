@@ -131,15 +131,24 @@ def build_multiteacher_weights(
 def build_batch_teacher_weights(
     strategy,
     teacher_uncertainty,
+    teacher_pred,
+    student_pred=None,
     global_teacher_weights=None,
 ):
     if teacher_uncertainty is None:
         raise ValueError(f"{strategy} requires teacher uncertainty inputs")
+    if teacher_pred is None:
+        raise ValueError(f"{strategy} requires teacher predictions")
 
     uncertainty = teacher_uncertainty.to(DEVICE)
+    teacher_pred = teacher_pred.to(DEVICE)
     if uncertainty.ndim != 2:
         raise ValueError(
             f"Expected teacher_uncertainty to have shape [batch, teachers], got {uncertainty.shape}"
+        )
+    if teacher_pred.ndim != 2:
+        raise ValueError(
+            f"Expected teacher_pred to have shape [batch, teachers], got {teacher_pred.shape}"
         )
 
     finite_mask = torch.isfinite(uncertainty)
@@ -154,10 +163,43 @@ def build_batch_teacher_weights(
     uncertainty = torch.where(finite_mask, uncertainty, fallback + 1.0)
 
     scores = -uncertainty
+    teacher_consensus = teacher_pred.mean(dim=1, keepdim=True)
+    teacher_disagreement = torch.abs(teacher_pred - teacher_consensus)
+    student_disagreement = None
+    if student_pred is not None:
+        student_disagreement = torch.abs(teacher_pred - student_pred.view(-1, 1))
+
     if strategy == "uncertainty_validation_prior":
         if global_teacher_weights is None:
             raise ValueError("uncertainty_validation_prior requires global teacher weights")
         scores = scores + torch.log(global_teacher_weights.clamp_min(1e-8)).view(1, -1)
+    elif strategy == "uncertainty_teacher_disagreement":
+        scores = scores - teacher_disagreement
+    elif strategy == "uncertainty_teacher_student":
+        if student_disagreement is None:
+            raise ValueError("uncertainty_teacher_student requires student predictions")
+        scores = scores - student_disagreement
+    elif strategy == "uncertainty_student_prior":
+        if student_disagreement is None:
+            raise ValueError("uncertainty_student_prior requires student predictions")
+        if global_teacher_weights is None:
+            raise ValueError("uncertainty_student_prior requires global teacher weights")
+        scores = (
+            scores
+            + torch.log(global_teacher_weights.clamp_min(1e-8)).view(1, -1)
+            - student_disagreement
+        )
+    elif strategy == "uncertainty_composite":
+        if student_disagreement is None:
+            raise ValueError("uncertainty_composite requires student predictions")
+        if global_teacher_weights is None:
+            raise ValueError("uncertainty_composite requires global teacher weights")
+        scores = (
+            scores
+            + torch.log(global_teacher_weights.clamp_min(1e-8)).view(1, -1)
+            - teacher_disagreement
+            - student_disagreement
+        )
     elif strategy != "uncertainty_only":
         raise ValueError(f"Unknown sample-level multiteacher strategy: {strategy}")
 
@@ -396,6 +438,10 @@ def train_one_model(
     uses_sample_level_gate = multiteacher_strategy in {
         "uncertainty_only",
         "uncertainty_validation_prior",
+        "uncertainty_teacher_disagreement",
+        "uncertainty_teacher_student",
+        "uncertainty_student_prior",
+        "uncertainty_composite",
     }
     teacher_weights = None
     multiteacher_info = None
@@ -404,8 +450,18 @@ def train_one_model(
             raise ValueError("--teacher-root is required when using --teacher-models")
         global_weight_strategy = (
             "validation_weighted"
-            if multiteacher_strategy == "uncertainty_validation_prior"
-            else "uniform" if multiteacher_strategy == "uncertainty_only" else multiteacher_strategy
+            if multiteacher_strategy in {
+                "uncertainty_validation_prior",
+                "uncertainty_student_prior",
+                "uncertainty_composite",
+            }
+            else "uniform"
+            if multiteacher_strategy in {
+                "uncertainty_only",
+                "uncertainty_teacher_disagreement",
+                "uncertainty_teacher_student",
+            }
+            else multiteacher_strategy
         )
         teacher_weights, multiteacher_info = build_multiteacher_weights(
             teacher_root=teacher_root,
@@ -471,15 +527,17 @@ def train_one_model(
             if teacher_pred is not None:
                 teacher_pred = teacher_pred.to(DEVICE)
             batch_teacher_weights = teacher_weights
+            outputs = model(fp, desc)
             if uses_sample_level_gate:
                 batch_teacher_weights = build_batch_teacher_weights(
                     strategy=multiteacher_strategy,
                     teacher_uncertainty=teacher_uncertainty,
+                    teacher_pred=teacher_pred,
+                    student_pred=outputs["pred"].detach().view(-1),
                     global_teacher_weights=teacher_weights,
                 )
 
             optimizer.zero_grad()
-            outputs = model(fp, desc)
             total_loss, task_loss, transfer_loss, distill_loss = compute_total_loss(
                 outputs=outputs,
                 y=y,
@@ -628,6 +686,10 @@ def parse_args():
             "top1_validation",
             "uncertainty_only",
             "uncertainty_validation_prior",
+            "uncertainty_teacher_disagreement",
+            "uncertainty_teacher_student",
+            "uncertainty_student_prior",
+            "uncertainty_composite",
         ],
         default="uniform",
     )
