@@ -195,9 +195,12 @@ def build_batch_teacher_weights(
     student_pred=None,
     global_teacher_weights=None,
     gate_module=None,
+    selector_confidence_threshold=0.6,
 ):
     if strategy in {
         "pretrained_selector_top1",
+        "pretrained_selector_confidence_fallback_top1",
+        "pretrained_selector_validation_blend_top1",
         "pretrained_selector_top2",
         "selector_filtered_uniform",
         "selector_filtered_validation_weighted",
@@ -211,6 +214,28 @@ def build_batch_teacher_weights(
             top1_idx = torch.argmax(selector_probs, dim=1, keepdim=True)
             weights = torch.zeros_like(selector_probs)
             weights.scatter_(1, top1_idx, 1.0)
+            return weights
+        if strategy == "pretrained_selector_validation_blend_top1":
+            if global_teacher_weights is None:
+                raise ValueError("pretrained_selector_validation_blend_top1 requires global teacher weights")
+            blended_probs = selector_probs * global_teacher_weights.view(1, -1)
+            top1_idx = torch.argmax(blended_probs, dim=1, keepdim=True)
+            weights = torch.zeros_like(selector_probs)
+            weights.scatter_(1, top1_idx, 1.0)
+            return weights
+        if strategy == "pretrained_selector_confidence_fallback_top1":
+            if global_teacher_weights is None:
+                raise ValueError("pretrained_selector_confidence_fallback_top1 requires global teacher weights")
+            selector_top1_idx = torch.argmax(selector_probs, dim=1, keepdim=True)
+            fallback_idx = torch.argmax(global_teacher_weights).view(1, 1).expand(selector_probs.shape[0], 1)
+            selector_confidence = torch.max(selector_probs, dim=1, keepdim=True).values
+            chosen_idx = torch.where(
+                selector_confidence >= selector_confidence_threshold,
+                selector_top1_idx,
+                fallback_idx,
+            )
+            weights = torch.zeros_like(selector_probs)
+            weights.scatter_(1, chosen_idx, 1.0)
             return weights
         if strategy == "pretrained_selector_top2":
             top2_idx = torch.topk(selector_probs, k=min(2, selector_probs.shape[1]), dim=1).indices
@@ -526,6 +551,7 @@ def train_one_model(
     selector_root=None,
     selector_model_name=None,
     multiteacher_strategy="uniform",
+    selector_confidence_threshold=0.6,
     lambda_distill=0.0,
     lambda_gate_supervision=0.0,
     adaptive_distill_strategy="none",
@@ -576,6 +602,8 @@ def train_one_model(
         "supervised_hard_top1_gate",
         "supervised_hard_top2_gate",
         "pretrained_selector_top1",
+        "pretrained_selector_confidence_fallback_top1",
+        "pretrained_selector_validation_blend_top1",
         "pretrained_selector_top2",
         "selector_filtered_uniform",
         "selector_filtered_validation_weighted",
@@ -598,6 +626,8 @@ def train_one_model(
                 "supervised_hard_top1_gate",
                 "supervised_hard_top2_gate",
                 "pretrained_selector_top1",
+                "pretrained_selector_confidence_fallback_top1",
+                "pretrained_selector_validation_blend_top1",
                 "pretrained_selector_top2",
                 "selector_filtered_validation_weighted",
             }
@@ -700,6 +730,7 @@ def train_one_model(
                     student_pred=outputs["pred"].detach().view(-1),
                     global_teacher_weights=teacher_weights,
                     gate_module=gate_module,
+                    selector_confidence_threshold=selector_confidence_threshold,
                 )
 
             optimizer.zero_grad()
@@ -891,12 +922,15 @@ def parse_args():
             "supervised_hard_top1_gate",
             "supervised_hard_top2_gate",
             "pretrained_selector_top1",
+            "pretrained_selector_confidence_fallback_top1",
+            "pretrained_selector_validation_blend_top1",
             "pretrained_selector_top2",
             "selector_filtered_uniform",
             "selector_filtered_validation_weighted",
         ],
         default="uniform",
     )
+    parser.add_argument("--selector-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--lambda-distill", type=float, default=0.0)
     parser.add_argument("--lambda-gate-supervision", type=float, default=0.0)
     parser.add_argument(
@@ -919,6 +953,8 @@ def main():
         )
     selector_strategies = {
         "pretrained_selector_top1",
+        "pretrained_selector_confidence_fallback_top1",
+        "pretrained_selector_validation_blend_top1",
         "pretrained_selector_top2",
         "selector_filtered_uniform",
         "selector_filtered_validation_weighted",
@@ -962,6 +998,7 @@ def main():
                         selector_root=args.selector_root,
                         selector_model_name=args.selector_model_name,
                         multiteacher_strategy=args.multiteacher_strategy,
+                        selector_confidence_threshold=args.selector_confidence_threshold,
                         lambda_distill=args.lambda_distill,
                         lambda_gate_supervision=args.lambda_gate_supervision,
                         adaptive_distill_strategy=args.adaptive_distill_strategy,
