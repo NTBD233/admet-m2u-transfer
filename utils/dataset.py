@@ -125,42 +125,56 @@ def make_loaders(
     )
 
     teacher_train_path = None
+    teacher_valid_path = None
+    teacher_test_path = None
     teacher_train_paths = None
+    teacher_valid_paths = None
+    teacher_test_paths = None
     if teacher_root is not None and teacher_model is not None and seed is not None:
-        teacher_train_path = (
+        teacher_dir = (
             Path(teacher_root)
             / dataset_name
             / teacher_model
             / f"train_{train_ratio_tag}"
             / f"seed_{seed}"
-            / f"train_{train_ratio_tag}_teacher_predictions.npz"
         )
+        teacher_train_path = teacher_dir / f"train_{train_ratio_tag}_teacher_predictions.npz"
+        teacher_valid_path = teacher_dir / "valid_teacher_predictions.npz"
+        teacher_test_path = teacher_dir / "test_teacher_predictions.npz"
         if not teacher_train_path.exists():
             raise FileNotFoundError(f"Missing teacher predictions: {teacher_train_path}")
     if teacher_root is not None and teacher_models is not None and seed is not None:
         teacher_train_paths = []
+        teacher_valid_paths = []
+        teacher_test_paths = []
         for teacher_name in teacher_models:
-            teacher_path = (
+            teacher_dir = (
                 Path(teacher_root)
                 / dataset_name
                 / teacher_name
                 / f"train_{train_ratio_tag}"
                 / f"seed_{seed}"
-                / f"train_{train_ratio_tag}_teacher_predictions.npz"
             )
+            teacher_path = teacher_dir / f"train_{train_ratio_tag}_teacher_predictions.npz"
             if not teacher_path.exists():
                 raise FileNotFoundError(f"Missing teacher predictions: {teacher_path}")
             teacher_train_paths.append(teacher_path)
+            teacher_valid_paths.append(teacher_dir / "valid_teacher_predictions.npz")
+            teacher_test_paths.append(teacher_dir / "test_teacher_predictions.npz")
     selector_train_path = None
+    selector_valid_path = None
+    selector_test_path = None
     if selector_root is not None and selector_model_name is not None and seed is not None:
-        selector_train_path = (
+        selector_dir = (
             Path(selector_root)
             / dataset_name
             / selector_model_name
             / f"train_{train_ratio_tag}"
             / f"seed_{seed}"
-            / "train_selector_predictions.npz"
         )
+        selector_train_path = selector_dir / "train_selector_predictions.npz"
+        selector_valid_path = selector_dir / "valid_selector_predictions.npz"
+        selector_test_path = selector_dir / "test_selector_predictions.npz"
         if not selector_train_path.exists():
             raise FileNotFoundError(f"Missing selector predictions: {selector_train_path}")
 
@@ -172,8 +186,35 @@ def make_loaders(
         selector_path=selector_train_path,
     )
     valid_ds = M2UFeatureDataset(valid_path, task_type)
-    test_ds = M2UFeatureDataset(test_path, task_type)
-
+    if teacher_valid_paths is not None:
+        valid_ds = M2UFeatureDataset(
+            valid_path,
+            task_type,
+            teacher_paths=teacher_valid_paths,
+            selector_path=selector_valid_path,
+        )
+        test_ds = M2UFeatureDataset(
+            test_path,
+            task_type,
+            teacher_paths=teacher_test_paths,
+            selector_path=selector_test_path,
+        )
+    elif teacher_valid_path is not None:
+        valid_ds = M2UFeatureDataset(
+            valid_path,
+            task_type,
+            teacher_path=teacher_valid_path,
+            selector_path=selector_valid_path,
+        )
+        test_ds = M2UFeatureDataset(
+            test_path,
+            task_type,
+            teacher_path=teacher_test_path,
+            selector_path=selector_test_path,
+        )
+    else:
+        valid_ds = M2UFeatureDataset(valid_path, task_type)
+        test_ds = M2UFeatureDataset(test_path, task_type)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(valid_ds, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)

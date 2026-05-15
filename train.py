@@ -445,6 +445,7 @@ def compute_total_loss(
     lambda_transfer=LAMBDA_TRANSFER,
     teacher_pred=None,
     teacher_weights=None,
+    distill_sample_weights=None,
     lambda_distill=0.0,
 ):
     pred = outputs["pred"]
@@ -489,11 +490,14 @@ def compute_total_loss(
                 per_teacher_losses.append(teacher_loss)
             per_teacher_losses = torch.stack(per_teacher_losses, dim=1)
             if teacher_weights.ndim == 1:
-                distill_loss = torch.sum(per_teacher_losses * teacher_weights.view(1, -1), dim=1).mean()
+                per_sample_distill = torch.sum(per_teacher_losses * teacher_weights.view(1, -1), dim=1)
             elif teacher_weights.ndim == 2:
-                distill_loss = torch.sum(per_teacher_losses * teacher_weights, dim=1).mean()
+                per_sample_distill = torch.sum(per_teacher_losses * teacher_weights, dim=1)
             else:
                 raise ValueError(f"Unexpected teacher_weights shape: {teacher_weights.shape}")
+            if distill_sample_weights is not None:
+                per_sample_distill = per_sample_distill * distill_sample_weights.view(-1)
+            distill_loss = per_sample_distill.mean()
         elif task_type == "classification":
             distill_loss = F.binary_cross_entropy_with_logits(pred, teacher_pred)
         elif task_type == "regression":
@@ -531,6 +535,44 @@ def evaluate_model(model, loader, task_type):
     return metrics, pred_df
 
 
+@torch.no_grad()
+def choose_selector_reweight_mode(valid_loader, task_type, teacher_weights):
+    if teacher_weights is None:
+        return "global_confidence", None
+
+    global_top1_idx = int(torch.argmax(teacher_weights).item())
+    total = 0
+    selector_correct = 0
+    global_correct = 0
+
+    for batch in valid_loader:
+        teacher_pred = batch.get("teacher_pred")
+        selector_probs = batch.get("selector_probs")
+        y = batch["y"]
+        if teacher_pred is None or selector_probs is None:
+            continue
+        if task_type != "regression" or teacher_pred.ndim != 2 or teacher_pred.shape[1] <= 1:
+            continue
+
+        oracle_idx = torch.argmin(torch.abs(teacher_pred - y.view(-1, 1)), dim=1)
+        selector_idx = torch.argmax(selector_probs, dim=1)
+        selector_correct += int((selector_idx == oracle_idx).sum().item())
+        global_correct += int((oracle_idx == global_top1_idx).sum().item())
+        total += int(oracle_idx.numel())
+
+    if total == 0:
+        return "global_confidence", None
+
+    selector_acc = selector_correct / total
+    global_acc = global_correct / total
+    chosen_mode = "global_confidence" if selector_acc > global_acc else "disagreement_confidence"
+    return chosen_mode, {
+        "selector_valid_oracle_acc": selector_acc,
+        "top1_valid_oracle_acc": global_acc,
+        "resolved_selector_reweight_mode": chosen_mode,
+    }
+
+
 def is_better(current, best, higher_is_better):
     if best is None:
         return True
@@ -552,6 +594,8 @@ def train_one_model(
     selector_model_name=None,
     multiteacher_strategy="uniform",
     selector_confidence_threshold=0.6,
+    selector_distill_reweight=False,
+    selector_distill_reweight_mode="global_confidence",
     lambda_distill=0.0,
     lambda_gate_supervision=0.0,
     adaptive_distill_strategy="none",
@@ -611,6 +655,8 @@ def train_one_model(
     teacher_weights = None
     multiteacher_info = None
     gate_module = None
+    resolved_selector_reweight_mode = selector_distill_reweight_mode
+    selector_reweight_info = None
     if teacher_models is not None:
         if teacher_root is None:
             raise ValueError("--teacher-root is required when using --teacher-models")
@@ -652,6 +698,14 @@ def train_one_model(
         )
         if uses_sample_level_gate and multiteacher_info is not None:
             multiteacher_info["sample_level_gate"] = multiteacher_strategy
+    if selector_distill_reweight and selector_distill_reweight_mode == "auto":
+        resolved_selector_reweight_mode, selector_reweight_info = choose_selector_reweight_mode(
+            valid_loader=valid_loader,
+            task_type=task_type,
+            teacher_weights=teacher_weights,
+        )
+        if multiteacher_info is not None and selector_reweight_info is not None:
+            multiteacher_info.update(selector_reweight_info)
     if multiteacher_strategy == "learned_reliability_gate":
         gate_module = TeacherReliabilityGate().to(DEVICE)
     elif multiteacher_strategy == "learned_linear_gate":
@@ -684,6 +738,13 @@ def train_one_model(
             f"{dataset_name} | {model_name} | seed={seed} | "
             f"multiteacher={multiteacher_strategy} | "
             f"weights={multiteacher_info['teacher_weight_map']}"
+        )
+    if selector_reweight_info is not None:
+        print(
+            f"{dataset_name} | {model_name} | seed={seed} | "
+            f"selector_reweight_mode={selector_reweight_info['resolved_selector_reweight_mode']} | "
+            f"selector_valid_oracle_acc={selector_reweight_info['selector_valid_oracle_acc']:.4f} | "
+            f"top1_valid_oracle_acc={selector_reweight_info['top1_valid_oracle_acc']:.4f}"
         )
     if adaptive_distill_info is not None:
         print(
@@ -720,6 +781,7 @@ def train_one_model(
             if teacher_pred is not None:
                 teacher_pred = teacher_pred.to(DEVICE)
             batch_teacher_weights = teacher_weights
+            distill_sample_weights = None
             outputs = model(fp, desc)
             if uses_sample_level_gate:
                 batch_teacher_weights = build_batch_teacher_weights(
@@ -732,6 +794,27 @@ def train_one_model(
                     gate_module=gate_module,
                     selector_confidence_threshold=selector_confidence_threshold,
                 )
+            if (
+                selector_distill_reweight
+                and selector_probs is not None
+                and teacher_models is not None
+                and len(teacher_models) > 1
+            ):
+                selector_probs_device = selector_probs.to(DEVICE)
+                selector_confidence = torch.max(selector_probs_device, dim=1).values
+                if (
+                    resolved_selector_reweight_mode == "disagreement_confidence"
+                    and teacher_weights is not None
+                ):
+                    selector_top1_idx = torch.argmax(selector_probs_device, dim=1)
+                    global_top1_idx = int(torch.argmax(teacher_weights).item())
+                    disagreement_mask = selector_top1_idx != global_top1_idx
+                    distill_sample_weights = torch.ones_like(selector_confidence)
+                    distill_sample_weights[disagreement_mask] = (
+                        selector_confidence[disagreement_mask] * selector_probs_device.shape[1]
+                    )
+                else:
+                    distill_sample_weights = selector_confidence * selector_probs_device.shape[1]
 
             optimizer.zero_grad()
             total_loss, task_loss, transfer_loss, distill_loss = compute_total_loss(
@@ -743,6 +826,7 @@ def train_one_model(
                 lambda_transfer=lambda_transfer,
                 teacher_pred=teacher_pred,
                 teacher_weights=batch_teacher_weights,
+                distill_sample_weights=distill_sample_weights,
                 lambda_distill=lambda_distill_effective,
             )
             gate_supervision_loss = torch.tensor(0.0, device=DEVICE)
@@ -819,6 +903,8 @@ def train_one_model(
                 "teacher_models": teacher_models,
                 "selector_model_name": selector_model_name,
                 "multiteacher_strategy": multiteacher_strategy if teacher_models is not None else "single_teacher",
+                "selector_distill_reweight": selector_distill_reweight,
+                "selector_distill_reweight_mode": resolved_selector_reweight_mode if selector_distill_reweight else "none",
             }
             if adaptive_distill_info is not None:
                 best_state.update(adaptive_distill_info)
@@ -853,6 +939,8 @@ def train_one_model(
         "teacher_models": teacher_models,
         "selector_model_name": selector_model_name,
         "multiteacher_strategy": multiteacher_strategy if teacher_models is not None else "single_teacher",
+        "selector_distill_reweight": selector_distill_reweight,
+        "selector_distill_reweight_mode": resolved_selector_reweight_mode if selector_distill_reweight else "none",
         "best_epoch": best_epoch,
         "best_metric": float(best_metric),
         "valid_roc_auc": np.nan,
@@ -933,6 +1021,12 @@ def parse_args():
     parser.add_argument("--selector-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--lambda-distill", type=float, default=0.0)
     parser.add_argument("--lambda-gate-supervision", type=float, default=0.0)
+    parser.add_argument("--selector-distill-reweight", action="store_true")
+    parser.add_argument(
+        "--selector-distill-reweight-mode",
+        choices=["global_confidence", "disagreement_confidence", "auto"],
+        default="global_confidence",
+    )
     parser.add_argument(
         "--adaptive-distill-strategy",
         choices=["none", "teacher_valid_advantage"],
@@ -996,10 +1090,12 @@ def main():
                         teacher_model=args.teacher_model,
                         teacher_models=args.teacher_models,
                         selector_root=args.selector_root,
-                        selector_model_name=args.selector_model_name,
-                        multiteacher_strategy=args.multiteacher_strategy,
-                        selector_confidence_threshold=args.selector_confidence_threshold,
-                        lambda_distill=args.lambda_distill,
+                selector_model_name=args.selector_model_name,
+                multiteacher_strategy=args.multiteacher_strategy,
+                selector_confidence_threshold=args.selector_confidence_threshold,
+                selector_distill_reweight=args.selector_distill_reweight,
+                selector_distill_reweight_mode=args.selector_distill_reweight_mode,
+                lambda_distill=args.lambda_distill,
                         lambda_gate_supervision=args.lambda_gate_supervision,
                         adaptive_distill_strategy=args.adaptive_distill_strategy,
                         adaptive_base_results_root=args.adaptive_base_results_root,
