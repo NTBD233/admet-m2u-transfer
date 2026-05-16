@@ -186,14 +186,18 @@ Current status:
   improved over base AdapterFusion in `15/18` settings and over fixed
   single-teacher distillation in `13/18`, while avoiding the `20%` degradation
   caused by `low_resource_decay`.
-- This ratio-aware schedule is a secondary calibration component, not a
-  replacement for the main selector-supervision contribution.
+- The full 45-setting expansion of `high_resource_decay` improved mean test
+  RMSE over plain selector (`5.0814` vs `5.0889`) and nearly matched
+  `top1_validation` (`5.0792`), but did not decisively beat it. This is a
+  secondary calibration component, not a replacement for the main
+  selector-supervision contribution.
 
 Tracked summaries:
 
 - `paper_notes/second_paper_auto_reweight_partial_regression_summary.md`
 - `paper_notes/second_paper_selector_calibration_route_audit.md`
 - `paper_notes/second_paper_ratio_aware_distillation_summary.md`
+- `paper_notes/second_paper_high_resource_lambda_full_summary.md`
 
 ## Main Comparison Table
 

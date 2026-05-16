@@ -67,9 +67,11 @@ Current refinement after the ratio-aware lambda follow-up:
 > Treat train-ratio-aware distillation strength as a secondary calibration
 > component. The `high_resource_decay` schedule is more defensible than early
 > decay because it keeps low/medium-resource selector routing unchanged and only
-> weakens teacher forcing at `50%` train ratio, where partial regression showed
-> consistent aggregate gains. This supports the discussion point that teacher
-> selection and teacher strength are related but distinct problems.
+> weakens teacher forcing at `50%` train ratio. The full 45-setting expansion
+> improves plain selector mean RMSE (`5.0814` vs `5.0889`) and nearly matches
+> `top1_validation` (`5.0792`), but does not decisively beat it. This supports
+> the discussion point that teacher selection and teacher strength are related
+> but distinct problems.
 
 ## Abstract Skeleton
 

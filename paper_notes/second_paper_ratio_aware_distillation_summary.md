@@ -132,7 +132,11 @@ secondary calibration component or ablation:
 
 ## Recommended Next Step
 
-Run `high_resource_decay` on the full five-dataset regression matrix only if
-the paper needs an additional method column. Otherwise, keep it as a focused
-analysis that explains why selector routing still needs student-side
-distillation calibration.
+This follow-up has now been expanded to the full five-dataset regression
+matrix. See:
+
+- `paper_notes/second_paper_high_resource_lambda_full_summary.md`
+
+The full result confirms that `high_resource_decay` improves plain selector
+mean RMSE and narrows the gap to `top1_validation`, but does not decisively
+beat `top1_validation` overall.
