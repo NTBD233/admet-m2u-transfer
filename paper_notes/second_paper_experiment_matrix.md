@@ -181,11 +181,19 @@ Current status:
 - On the `caco2_wang + ppbr_az` 18-setting partial regression subset,
   auto reweighting lost to plain selector routing on mean RMSE and only won
   `7/18` settings vs plain selector.
+- Ratio-aware distillation strength was tested as a student-side calibration
+  follow-up. `high_resource_decay` (`10 -> 1.0`, `20 -> 1.0`, `50 -> 0.3`)
+  improved over base AdapterFusion in `15/18` settings and over fixed
+  single-teacher distillation in `13/18`, while avoiding the `20%` degradation
+  caused by `low_resource_decay`.
+- This ratio-aware schedule is a secondary calibration component, not a
+  replacement for the main selector-supervision contribution.
 
 Tracked summaries:
 
 - `paper_notes/second_paper_auto_reweight_partial_regression_summary.md`
 - `paper_notes/second_paper_selector_calibration_route_audit.md`
+- `paper_notes/second_paper_ratio_aware_distillation_summary.md`
 
 ## Main Comparison Table
 
@@ -217,6 +225,7 @@ Ablations:
 - routing mode: top-1 vs top-2 vs filtering;
 - selector training source: validation oracle prototype vs cross-fit pseudo-oracle;
 - joint gate vs frozen selector routing;
+- train-ratio lambda schedule: none vs high-resource decay vs early decay;
 - no descriptor-space OOD;
 - no conflict top-k;
 - MSE teacher loss instead of Huber;

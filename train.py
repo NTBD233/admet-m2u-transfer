@@ -591,6 +591,26 @@ def restore_rng_state(state):
         torch.cuda.set_rng_state_all(state["cuda"])
 
 
+def distill_ratio_factor(schedule, train_ratio_tag):
+    if schedule == "none":
+        return 1.0
+    if schedule == "low_resource_decay":
+        return {
+            10: 1.0,
+            20: 0.7,
+            50: 0.3,
+        }.get(int(train_ratio_tag), 1.0)
+    if schedule == "high_resource_decay":
+        return {
+            10: 1.0,
+            20: 1.0,
+            50: 0.3,
+        }.get(int(train_ratio_tag), 1.0)
+    if schedule == "sqrt_10_over_ratio":
+        return min(1.0, float(np.sqrt(10.0 / max(float(train_ratio_tag), 1.0))))
+    raise ValueError(f"Unknown distillation ratio schedule: {schedule}")
+
+
 def is_better(current, best, higher_is_better):
     if best is None:
         return True
@@ -615,6 +635,7 @@ def train_one_model(
     selector_distill_reweight=False,
     selector_distill_reweight_mode="global_confidence",
     lambda_distill=0.0,
+    lambda_distill_ratio_schedule="none",
     lambda_gate_supervision=0.0,
     adaptive_distill_strategy="none",
     adaptive_base_results_root=None,
@@ -740,8 +761,10 @@ def train_one_model(
         lr=LR,
         weight_decay=WEIGHT_DECAY,
     )
+    lambda_distill_ratio_factor = distill_ratio_factor(lambda_distill_ratio_schedule, train_ratio_tag)
+    lambda_distill_scheduled = lambda_distill * lambda_distill_ratio_factor
     lambda_distill_effective, adaptive_distill_info = resolve_lambda_distill(
-        lambda_distill=lambda_distill,
+        lambda_distill=lambda_distill_scheduled,
         adaptive_distill_strategy=adaptive_distill_strategy,
         base_results_root=adaptive_base_results_root,
         teacher_root=teacher_root,
@@ -916,6 +939,9 @@ def train_one_model(
                 "seed": seed,
                 "lambda_transfer": lambda_transfer,
                 "lambda_distill": lambda_distill,
+                "lambda_distill_ratio_schedule": lambda_distill_ratio_schedule,
+                "lambda_distill_ratio_factor": lambda_distill_ratio_factor,
+                "lambda_distill_scheduled": lambda_distill_scheduled,
                 "lambda_distill_effective": lambda_distill_effective,
                 "lambda_gate_supervision": lambda_gate_supervision,
                 "adaptive_distill_strategy": adaptive_distill_strategy,
@@ -952,6 +978,9 @@ def train_one_model(
         "seed": seed,
         "lambda_transfer": lambda_transfer,
         "lambda_distill": lambda_distill,
+        "lambda_distill_ratio_schedule": lambda_distill_ratio_schedule,
+        "lambda_distill_ratio_factor": lambda_distill_ratio_factor,
+        "lambda_distill_scheduled": lambda_distill_scheduled,
         "lambda_distill_effective": lambda_distill_effective,
         "lambda_gate_supervision": lambda_gate_supervision,
         "adaptive_distill_strategy": adaptive_distill_strategy,
@@ -1040,6 +1069,11 @@ def parse_args():
     )
     parser.add_argument("--selector-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--lambda-distill", type=float, default=0.0)
+    parser.add_argument(
+        "--lambda-distill-ratio-schedule",
+        choices=["none", "low_resource_decay", "high_resource_decay", "sqrt_10_over_ratio"],
+        default="none",
+    )
     parser.add_argument("--lambda-gate-supervision", type=float, default=0.0)
     parser.add_argument("--selector-distill-reweight", action="store_true")
     parser.add_argument(
@@ -1110,12 +1144,13 @@ def main():
                         teacher_model=args.teacher_model,
                         teacher_models=args.teacher_models,
                         selector_root=args.selector_root,
-                selector_model_name=args.selector_model_name,
-                multiteacher_strategy=args.multiteacher_strategy,
-                selector_confidence_threshold=args.selector_confidence_threshold,
-                selector_distill_reweight=args.selector_distill_reweight,
-                selector_distill_reweight_mode=args.selector_distill_reweight_mode,
-                lambda_distill=args.lambda_distill,
+                        selector_model_name=args.selector_model_name,
+                        multiteacher_strategy=args.multiteacher_strategy,
+                        selector_confidence_threshold=args.selector_confidence_threshold,
+                        selector_distill_reweight=args.selector_distill_reweight,
+                        selector_distill_reweight_mode=args.selector_distill_reweight_mode,
+                        lambda_distill=args.lambda_distill,
+                        lambda_distill_ratio_schedule=args.lambda_distill_ratio_schedule,
                         lambda_gate_supervision=args.lambda_gate_supervision,
                         adaptive_distill_strategy=args.adaptive_distill_strategy,
                         adaptive_base_results_root=args.adaptive_base_results_root,

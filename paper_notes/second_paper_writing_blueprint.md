@@ -62,6 +62,15 @@ Current refinement after the auto-reweight follow-up:
 > reproducible and locally useful, but not strong enough to beat plain selector
 > routing or `top1_validation` on aggregate.
 
+Current refinement after the ratio-aware lambda follow-up:
+
+> Treat train-ratio-aware distillation strength as a secondary calibration
+> component. The `high_resource_decay` schedule is more defensible than early
+> decay because it keeps low/medium-resource selector routing unchanged and only
+> weakens teacher forcing at `50%` train ratio, where partial regression showed
+> consistent aggregate gains. This supports the discussion point that teacher
+> selection and teacher strength are related but distinct problems.
+
 ## Abstract Skeleton
 
 Low-resource ADMET prediction benefits from inexpensive molecular knowledge
@@ -125,6 +134,9 @@ Write the introduction in this order:
    - provide filtering/routing ablations and mechanism analyses, including
      confidence calibration and validation route audits that explain why naive
      selector-confidence reweighting is insufficient.
+   - Include train-ratio-aware lambda as a secondary ablation if space allows:
+     it helps explain why the selected teacher can still over-constrain the
+     student when labeled data become less scarce.
 
 ### 2. Problem Formulation
 
