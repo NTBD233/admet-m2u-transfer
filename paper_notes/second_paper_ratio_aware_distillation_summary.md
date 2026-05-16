@@ -42,6 +42,18 @@ Result roots:
 - `results_pretrained_selector_top1_ratio_lambda_partial_regression`
 - `results_pretrained_selector_top1_high_resource_lambda_partial_regression`
 
+Reproducible comparison entrypoint:
+
+```bash
+make selector-calibration-comparison
+```
+
+This writes aggregate, wins, by-ratio, by-dataset, and per-setting tables under:
+
+```text
+results_pretrained_selector_top1_high_resource_lambda_partial_regression/summary/
+```
+
 ## Aggregate Results
 
 Mean test RMSE, lower is better:
