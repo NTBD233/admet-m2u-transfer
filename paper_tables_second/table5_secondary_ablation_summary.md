@@ -1,0 +1,7 @@
+| method | scope | mean_test_rmse | wins_vs_plain_selector | delta_vs_plain_selector |
+| --- | --- | --- | --- | --- |
+| Plain selector | caco2_wang + ppbr_az, 18 runs | 8.6091 |  |  |
+| Auto confidence reweight | caco2_wang + ppbr_az, 18 runs | 8.7875 | 7/18 | 0.1783 |
+| Low-resource decay | caco2_wang + ppbr_az, 18 runs | 8.6666 | 7/18 | 0.0575 |
+| High-resource decay | caco2_wang + ppbr_az, 18 runs | 8.5852 | 5/18 | -0.0239 |
+| Auto route-mode audit | caco2_wang + ppbr_az, 18 settings |  | 7/18 | 0.1784 |

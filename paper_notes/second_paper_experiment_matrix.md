@@ -199,6 +199,20 @@ Tracked summaries:
 - `paper_notes/second_paper_ratio_aware_distillation_summary.md`
 - `paper_notes/second_paper_high_resource_lambda_full_summary.md`
 
+Paper-ready tables:
+
+- `paper_tables_second/table1_main_aggregate_rmse.md`
+- `paper_tables_second/table2_main_by_setting_rmse.md`
+- `paper_tables_second/table3_selector_diagnostics.md`
+- `paper_tables_second/table4_selector_quality_by_dataset.md`
+- `paper_tables_second/table5_secondary_ablation_summary.md`
+
+Regenerate them with:
+
+```bash
+make second-paper-tables
+```
+
 ## Main Comparison Table
 
 Rows:
