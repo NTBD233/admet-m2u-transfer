@@ -172,6 +172,21 @@ Routing modes:
 - top-2 routing with normalized selector probabilities
 - selector-based teacher filtering before validation-weighted distillation
 
+Current status:
+
+- `pretrained_selector_top1` remains the strongest method candidate.
+- selector-confidence auto reweighting was tested as a follow-up, but should not
+  be promoted to a main method column unless a stronger student-side fix is
+  found.
+- On the `caco2_wang + ppbr_az` 18-setting partial regression subset,
+  auto reweighting lost to plain selector routing on mean RMSE and only won
+  `7/18` settings vs plain selector.
+
+Tracked summaries:
+
+- `paper_notes/second_paper_auto_reweight_partial_regression_summary.md`
+- `paper_notes/second_paper_selector_calibration_route_audit.md`
+
 ## Main Comparison Table
 
 Rows:

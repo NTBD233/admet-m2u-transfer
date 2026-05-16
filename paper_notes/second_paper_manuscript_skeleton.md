@@ -221,6 +221,12 @@ Compare:
 - pretrained selector top-2 routing;
 - selector-filtered validation-weighted distillation.
 
+Do not treat selector-confidence auto reweighting as a main method unless later
+experiments overturn the current partial-regression result. In the current
+evidence package, auto reweighting is a diagnostic follow-up: it is
+reproducible and locally helpful, but weaker than plain selector routing on
+aggregate.
+
 ### 4.4 Evaluation Questions
 
 1. Does selective distillation improve over base AdapterFusion?
@@ -252,7 +258,9 @@ Required analyses:
 - teacher conflict vs gain;
 - uncertainty-error correlation;
 - OOD distance vs gate weight;
-- failure-case table.
+- failure-case table;
+- selector confidence calibration;
+- validation route audit for setting-aware reweight decisions.
 
 ## 7. Discussion
 
@@ -262,6 +270,9 @@ Expected discussion points:
 - validation-only adaptive weighting is insufficient;
 - sample-level reliability and conflict handling provide a stronger
   formulation;
+- selector correctness and student usefulness are not equivalent;
+- confidence-based route-strength scaling is locally meaningful but not yet
+  robust enough to become the main method;
 - descriptor-access RF/XGB remains a strong control;
 - ECFP-only inference is still valuable when descriptors or teachers should not
   be required at deployment;

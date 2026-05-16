@@ -54,6 +54,14 @@ Controlled limitation:
 > selective training-time knowledge transfer into an ECFP-only student, not a
 > claim that the student always replaces descriptor-access models.
 
+Current refinement after the auto-reweight follow-up:
+
+> Keep `pretrained_selector_top1` as the main method candidate. Treat
+> confidence-based auto reweighting as a mechanism analysis, not as the main
+> upgraded method. The partial regression audit shows that auto reweighting is
+> reproducible and locally useful, but not strong enough to beat plain selector
+> routing or `top1_validation` on aggregate.
+
 ## Abstract Skeleton
 
 Low-resource ADMET prediction benefits from inexpensive molecular knowledge
@@ -114,7 +122,9 @@ Write the introduction in this order:
    - formulate low-resource ECFP-only ADMET transfer as a teacher-selection problem;
    - show that oracle best-teacher labels are predictable while joint routing fails;
    - propose cross-fit selector pretraining plus frozen top-1 routing;
-   - provide filtering/routing ablations and mechanism analyses.
+   - provide filtering/routing ablations and mechanism analyses, including
+     confidence calibration and validation route audits that explain why naive
+     selector-confidence reweighting is insufficient.
 
 ### 2. Problem Formulation
 
