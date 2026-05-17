@@ -120,24 +120,34 @@ The target head predicts from \(z_{fused}\), while the descriptor head predicts
 
 ### 3.2 Molecular Expert Teachers
 
-The first version uses reproducible RF/XGB teachers:
+The formal experiments use three random-forest teachers that expose different
+molecular views:
 
-- fingerprint teachers: `ECFP4_RF`, `ECFP4_XGB`;
-- descriptor-only teachers: `Desc_RF`, `Desc_XGB`;
-- descriptor-access teachers: `ECFP4_Desc_RF`, `ECFP4_Desc_XGB`.
+- `ECFP4_RF`, trained only on ECFP4 fingerprints;
+- `Desc_RF`, trained only on standardized RDKit descriptors;
+- `ECFP4_Desc_RF`, trained on concatenated ECFP4 and descriptor features.
 
-These teachers represent different molecular views and modeling biases.
-Chemprop is deferred until the RF/XGB reliability pipeline is established.
+These teachers are intentionally simple. They provide a controlled setting in
+which the student must choose among fingerprint-only, descriptor-only, and
+descriptor-access supervision. XGBoost and graph/pretrained molecular teachers
+are natural extensions, but they are not required for the main claim in this
+version.
 
 ### 3.3 Teacher-Selection Features
 
-For teacher \(T_i\), teacher selection is estimated from:
+For each molecule, the selector receives teacher-specific and shared
+reliability features. For teacher \(T_i\), these include:
 
-- validation quality \(q_i\);
-- teacher uncertainty \(u_i(x)\);
-- teacher agreement \(a_i(x)\);
-- teacher-student disagreement \(\delta_i(x)\);
-- descriptor-space OOD score \(o(x)\).
+- teacher uncertainty \(u_i(x)\), estimated from the RF ensemble;
+- teacher consensus deviation \(|\hat{y}_i-\frac{1}{K}\sum_j \hat{y}_j|\);
+- a validation-derived teacher prior \(q_i\), computed from setting-level
+  teacher validation RMSE;
+- a shared descriptor-space OOD distance \(o(x)\).
+
+The implemented selector feature vector is the concatenation of uncertainty,
+consensus deviation, and prior weight for each teacher, plus descriptor-space
+OOD distance. Teacher-student disagreement is analyzed as a failure mode, but
+is not part of the formal pretrained selector used in the main experiments.
 
 ### 3.4 Cross-Fit Selector Pretraining
 
@@ -151,29 +161,30 @@ y^{sel}(x)=\arg\min_i |\hat{y}_i(x)-y|.
 \]
 
 A selector \(h_\phi\) is trained on these labels. The first formal version uses
-a random-forest selector, with logistic regression as a lighter baseline.
+a random-forest classifier with median imputation, 200 trees, maximum depth 8,
+and minimum leaf size 5. Logistic regression is used only as a diagnostic
+baseline for selector predictability.
 
 ### 3.5 Frozen Routing Distillation
 
 After selector pretraining, the selector is frozen. For each training sample,
-it outputs either:
-
-- a top-1 teacher for hard routing; or
-- a filtered teacher subset for simplified multi-teacher distillation.
-
-The main version uses hard top-1 routing:
+it outputs a probability distribution over teachers. The main method uses hard
+top-1 routing:
 
 \[
 i^*(x)=\arg\max_i h_\phi(r(x))_i,
 \qquad
 \mathcal{L}_{distill}=
-\mathrm{Huber}(\hat{y}_S,\hat{y}_{i^*(x)}).
+\left(\hat{y}_S-\hat{y}_{i^*(x)}\right)^2.
 \]
 
-The simplified filtering version keeps only trusted teachers and applies
-validation-weighted distillation on the surviving subset.
+The selector is not updated during student training. This is deliberate: the
+student receives a fixed teacher-selection signal rather than jointly learning
+task prediction and routing from the same low-resource loss. Selector-filtered
+and top-2 routing variants are implemented as secondary comparisons, but the
+main reported method is frozen top-1 routing.
 
-### 3.5 Training Objective
+### 3.6 Training Objective And Ratio-Aware Calibration
 
 For regression:
 
@@ -181,16 +192,31 @@ For regression:
 \mathcal{L}=
 \mathcal{L}_{task}
 +\lambda_{desc}\mathcal{L}_{desc}
-+\lambda_{mt}\sum_i w_i(x)c(x)
-\mathrm{Huber}(\hat{y}_S,\hat{y}_i).
++\lambda_{mt}\sum_i w_i(x)
+\left(\hat{y}_S-\hat{y}_i\right)^2.
 \]
 
-Defaults:
+For the main pretrained selector, \(w_i(x)\) is one-hot at the selected
+teacher. For uniform and validation-weighted baselines, \(w_i(x)\) is either
+uniform or derived from teacher validation RMSE. The default setting uses
+\(\lambda_{desc}=0.1\) and \(\lambda_{mt}=1.0\).
 
-- \(\lambda_{desc}=0.1\);
-- \(\lambda_{mt}=1.0\);
-- Huber teacher loss;
-- MSE teacher loss as ablation.
+The calibrated selector variant uses the same routing rule but applies a
+train-ratio schedule to \(\lambda_{mt}\):
+
+\[
+s(r)=
+\begin{cases}
+1.0, & r\in\{10,20\},\\
+0.3, & r=50,
+\end{cases}
+\qquad
+\lambda_{mt}^{eff}=\lambda_{mt}s(r).
+\]
+
+This high-resource decay is treated as a secondary calibration: it tests
+whether selected teacher supervision should be weakened once more labeled data
+are available.
 
 ## 4. Experiments
 
@@ -213,27 +239,24 @@ Student baselines:
 
 - base AdapterFusion;
 - fixed `ECFP4_Desc_RF` distillation with `lambda_distill=1.0`;
-   - uniform multi-teacher distillation;
-   - validation-weighted multi-teacher distillation;
-   - top-1 validation teacher distillation;
-   - jointly learned soft/hard routing gates.
+- uniform multi-teacher distillation;
+- validation-weighted multi-teacher distillation;
+- top-1 validation teacher distillation;
+- jointly learned soft/hard routing gates.
 
-Descriptor-access controls:
+Teacher controls:
 
 - `ECFP4_RF`;
 - `Desc_RF`;
-- `ECFP4_Desc_RF`;
-- `ECFP4_XGB`;
-- `Desc_XGB`;
-- `ECFP4_Desc_XGB`.
+- `ECFP4_Desc_RF`.
 
 ### 4.3 Main Method
 
 Compare:
 
 - pretrained selector hard top-1 routing;
-- pretrained selector top-2 routing;
-- selector-filtered validation-weighted distillation.
+- pretrained selector with high-resource lambda decay;
+- selector-filtered and top-2 routing variants as secondary comparisons.
 
 Do not treat selector-confidence auto reweighting as a main method unless later
 experiments overturn the current partial-regression result. In the current
@@ -246,9 +269,9 @@ aggregate.
 1. Does selective distillation improve over base AdapterFusion?
 2. Does it improve over fixed single-teacher distillation?
 3. Does it improve over uniform multi-teacher distillation?
-4. Does conflict-aware top-k help under high teacher disagreement?
-5. Are teacher weights interpretable across endpoint, train ratio, and
-   descriptor-space coverage?
+4. Does high-resource distillation decay improve routed selector training?
+5. Are selector diagnostics and failure modes consistent with the student-level
+   RMSE results?
 
 ## 5. Results
 
@@ -464,7 +487,7 @@ matches `top1_validation`. However, weakening teacher supervision earlier is
 not robust. This suggests that future work should model teacher strength as a
 separate calibrated quantity rather than folding it into teacher identity.
 
-Descriptor-access RF/XGB teachers remain important controls. In several
+Descriptor-access RF teachers remain important controls. In several
 settings, descriptor-access models or setting-level teacher choices still
 match or exceed the ECFP-only student. The contribution of this work is not to
 claim that ECFP-only inference universally dominates descriptor-access
