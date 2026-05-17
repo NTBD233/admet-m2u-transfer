@@ -222,56 +222,54 @@ are available.
 
 ### 4.1 Datasets And Protocol
 
-Main experiments use five regression ADMET datasets:
-
-- `caco2_wang`;
-- `lipophilicity_astrazeneca`;
-- `solubility_aqsoldb`;
-- `vdss_lombardo`;
-- `ppbr_az`.
-
-Each dataset uses 10%, 20%, and 50% training ratios with seeds 42, 123, and
-3407. The primary metric is test RMSE.
+The main experiments focus on regression ADMET prediction. We evaluate on five
+endpoints: `caco2_wang`, `lipophilicity_astrazeneca`,
+`solubility_aqsoldb`, `vdss_lombardo`, and `ppbr_az`. For each endpoint, we
+use 10%, 20%, and 50% training ratios with seeds 42, 123, and 3407, giving 45
+dataset-ratio-seed settings. The primary metric is test RMSE, where lower is
+better. Validation splits are used for teacher-prior estimation, model
+selection, and setting-level teacher baselines, but the pretrained selector's
+formal supervision comes from cross-fit pseudo-oracle labels within the
+training split.
 
 ### 4.2 Baselines
 
-Student baselines:
+We compare against several levels of teacher use. The first baseline is the
+base ECFP-only AdapterFusion student with descriptor reconstruction but no
+teacher distillation. The second is fixed single-teacher distillation from
+`ECFP4_Desc_RF`, which represents the strongest descriptor-access teacher from
+the pilot setting. Multi-teacher controls include uniform averaging,
+validation-weighted distillation, and `top1_validation`, which selects the
+best validation teacher for the entire dataset-ratio-seed setting. These
+baselines test whether the proposed method improves over adding more teachers
+or over choosing a strong setting-level teacher.
 
-- base AdapterFusion;
-- fixed `ECFP4_Desc_RF` distillation with `lambda_distill=1.0`;
-- uniform multi-teacher distillation;
-- validation-weighted multi-teacher distillation;
-- top-1 validation teacher distillation;
-- jointly learned soft/hard routing gates.
-
-Teacher controls:
-
-- `ECFP4_RF`;
-- `Desc_RF`;
-- `ECFP4_Desc_RF`.
+We also keep the individual RF teachers as teacher controls:
+`ECFP4_RF`, `Desc_RF`, and `ECFP4_Desc_RF`. These controls are not ECFP-only
+student models; they define the teacher pool and expose how much information
+is available from fingerprint-only, descriptor-only, and descriptor-access
+views.
 
 ### 4.3 Main Method
 
-Compare:
-
-- pretrained selector hard top-1 routing;
-- pretrained selector with high-resource lambda decay;
-- selector-filtered and top-2 routing variants as secondary comparisons.
-
-Do not treat selector-confidence auto reweighting as a main method unless later
-experiments overturn the current partial-regression result. In the current
-evidence package, auto reweighting is a diagnostic follow-up: it is
-reproducible and locally helpful, but weaker than plain selector routing on
-aggregate.
+The main method is pretrained selector hard top-1 routing. We additionally
+report a calibrated variant with high-resource lambda decay, which keeps
+distillation strength unchanged at 10% and 20% train ratios but reduces it at
+50%. Selector-filtered and top-2 variants are treated as secondary comparisons
+because the current evidence favors top-1 frozen routing as the cleanest
+method. Selector-confidence auto reweighting is reported only as a diagnostic
+negative result: it is reproducible and locally helpful, but weaker than plain
+selector routing on aggregate.
 
 ### 4.4 Evaluation Questions
 
-1. Does selective distillation improve over base AdapterFusion?
-2. Does it improve over fixed single-teacher distillation?
-3. Does it improve over uniform multi-teacher distillation?
-4. Does high-resource distillation decay improve routed selector training?
-5. Are selector diagnostics and failure modes consistent with the student-level
-   RMSE results?
+The experiments are designed to answer five questions. First, does selective
+distillation improve over the base ECFP-only AdapterFusion student? Second,
+does it improve over fixed single-teacher descriptor distillation? Third, does
+pretrained selector routing add value beyond uniform and validation-weighted
+multi-teacher distillation? Fourth, does high-resource distillation decay
+improve routed selector training? Finally, do selector diagnostics and failure
+modes explain the student-level RMSE results?
 
 ## 5. Results
 
