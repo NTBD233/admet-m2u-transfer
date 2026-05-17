@@ -46,15 +46,19 @@ Low-resource ADMET prediction is difficult because labeled measurements are
 scarce, noisy, and endpoint-specific. At the same time, molecules have
 multiple inexpensive sources of predictive information, including ECFP
 fingerprints, physicochemical descriptors, and predictions from traditional
-machine learning models trained on these representations. Descriptor-access
+machine learning models trained on these representations
+\cite{Rogers2010,RDKit2026,Breiman2001,Chen2016XGBoost}. Descriptor-access
 models can be strong practical predictors, but many deployment settings still
-favor a lightweight predictor that consumes only fingerprints at inference.
+favor a lightweight predictor that consumes only fingerprints at inference
+\cite{Wu2018MoleculeNet,Huang2021TDC,Xiong2021ADMETlab,Swanson2024ADMETAI}.
 
 Training-time descriptor transfer addresses this mismatch by using descriptor
 information during learning while keeping the deployed student ECFP-only. A
 pilot study shows that descriptor reconstruction and descriptor-teacher
 distillation can improve an ECFP-only AdapterFusion student for low-resource
-regression ADMET. However, fixed distillation strength is not uniformly
+regression ADMET. This follows the broader knowledge-distillation idea of
+transferring supervision from a stronger or differently informed model into a
+lighter student \cite{Hinton2015}. However, fixed distillation strength is not uniformly
 optimal, and validation-advantage adaptive weighting underperforms fixed
 strong distillation. This suggests that the unresolved problem is not whether
 teacher knowledge can help, but when a student should trust each teacher.
@@ -93,7 +97,9 @@ standardized descriptor vector, and \(y\) the ADMET target. The student model
 During training, descriptor information and teacher predictions may be used.
 Let \(T_1,\ldots,T_K\) be molecular expert teachers, where each teacher
 produces \(\hat{y}_i=T_i(x)\). The goal is not to average teacher predictions
-uniformly. Instead, the student uses a learned teacher selector
+uniformly. Instead, the student uses a learned teacher selector, motivated by
+classical mixture-of-experts routing and modern multi-teacher distillation
+\cite{Jacobs1991MoE,Shi2021ReinforcedMTS,Liu2021AdaptiveMTKD,Zhang2022CAMKD},
 \[
 \pi(x)=h_\phi(r(x)),
 \]
@@ -139,7 +145,9 @@ teacher consensus deviation
 \left|\hat{y}_i-\frac{1}{K}\sum_j\hat{y}_j\right|,
 \]
 and a validation-derived teacher prior computed from setting-level teacher validation RMSE. A shared
-descriptor-space OOD distance is appended to the feature vector. Teacher-student
+descriptor-space OOD distance is appended to the feature vector, following the
+general QSAR concern that predictions are less reliable outside a model's
+applicability domain \cite{Netzeva2005AD,Tropsha2010QSAR}. Teacher-student
 disagreement is analyzed as a failure mode, but is not part of the formal
 pretrained selector used in the main experiments.
 
@@ -154,7 +162,9 @@ y^{sel}(x)=\arg\min_i |\hat{y}_i(x)-y|.
 \]
 A random-forest classifier is trained on these labels with median imputation,
 200 trees, maximum depth 8, and minimum leaf size 5. Logistic regression is
-used only as a diagnostic baseline for selector predictability.
+used only as a diagnostic baseline for selector predictability. The use of
+out-of-fold labels follows the same leakage-control logic that underlies
+standard QSAR validation practice \cite{Tropsha2010QSAR}.
 
 \subsection{Frozen routing distillation}
 
@@ -202,7 +212,10 @@ weakened once more labeled data are available.
 The main experiments focus on regression ADMET prediction. We evaluate on five
 endpoints: \texttt{caco2\_wang}, \texttt{lipophilicity\_astrazeneca},
 \texttt{solubility\_aqsoldb}, \texttt{vdss\_lombardo}, and
-\texttt{ppbr\_az}. For each endpoint, we use 10\%, 20\%, and 50\% training
+\texttt{ppbr\_az}. These endpoints are drawn from the TDC and MoleculeNet
+style molecular property benchmark ecosystem \cite{Wu2018MoleculeNet,Huang2021TDC};
+for solubility, \texttt{solubility\_aqsoldb} traces to the AqSolDB resource
+\cite{Sorkun2019AqSolDB}. For each endpoint, we use 10\%, 20\%, and 50\% training
 ratios with seeds 42, 123, and 3407, giving 45 dataset-ratio-seed settings.
 The primary metric is test RMSE. Validation splits are used for teacher-prior
 estimation, model selection, and setting-level teacher baselines, but the
@@ -385,6 +398,9 @@ as a teacher-averaging problem. Fixed descriptor-teacher distillation improves
 the ECFP-only student, but it assumes that the same teacher and the same
 distillation strength are appropriate across endpoints, train ratios, and
 samples. The multi-teacher baselines show that this assumption is too coarse.
+This is consistent with recent molecular learning work showing that multiple
+views or auxiliary tasks can help, but that their value is not uniform across
+settings \cite{Zheng2024MolFuse,Du2023MTGLADMET,Dey2024AuxAdapt}.
 
 The proposed selector-pretraining strategy addresses a different failure mode
 from standard adaptive weighting. Joint gates learn routing and target
@@ -407,6 +423,11 @@ exceed the ECFP-only student. The contribution of this work is not to claim
 that ECFP-only inference universally dominates descriptor-access prediction.
 Instead, it targets a deployment constraint: the student can use descriptors
 and teacher predictions during training, but needs only ECFP4 at inference.
+This complements graph and pretrained molecular representation learning
+\cite{Yang2019DMPNN,Rong2020GROVER,Hu2020PretrainGNN,Liu2022GraphMVP,Heid2024Chemprop}
+and recent cross-view molecular distillation work \cite{Zeng2024MolKD}
+rather than replacing it; those models are natural candidates for future
+teacher pools once the selector-supervision protocol is established.
 
 \section{Limitations}
 
@@ -450,5 +471,8 @@ The remaining gap highlights an important distinction: selecting a teacher,
 choosing how strongly to imitate it, and obtaining student-level benefit are
 related but distinct problems. This makes supervised teacher selection a
 practical foundation for future ECFP-only molecular distillation systems.
+
+\bibliographystyle{unsrt}
+\bibliography{references}
 
 \end{document}
