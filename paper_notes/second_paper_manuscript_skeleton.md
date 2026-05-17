@@ -412,26 +412,99 @@ ECFP-only.
 
 ## 7. Discussion
 
-Expected discussion points:
+The main lesson from these experiments is that multi-teacher distillation for
+low-resource ADMET should be treated as a teacher-selection problem, not only
+as a teacher-averaging problem. Fixed descriptor-teacher distillation improves
+the ECFP-only student, but it assumes that the same teacher and the same
+distillation strength are appropriate across endpoints, train ratios, and
+samples. The multi-teacher baselines show that this assumption is too coarse:
+uniform averaging improves over the base student but is weaker than
+validation-informed teacher selection, and the best setting-level strategy
+changes across endpoint and resource regime.
 
-- fixed distillation is useful but too coarse;
-- validation-only adaptive weighting is insufficient;
-- sample-level reliability and conflict handling provide a stronger
-  formulation;
-- selector correctness and student usefulness are not equivalent;
-- confidence-based route-strength scaling is locally meaningful but not yet
-  robust enough to become the main method;
-- descriptor-access RF/XGB remains a strong control;
-- ECFP-only inference is still valuable when descriptors or teachers should not
-  be required at deployment;
-- Chemprop/pretrained teachers are a natural next extension.
+The proposed selector-pretraining strategy addresses a different failure mode
+from standard adaptive weighting. Joint gates learn routing and target
+prediction simultaneously, which makes them vulnerable to low-resource task
+noise and early optimization dynamics. In contrast, the cross-fit selector is
+trained with an explicit pseudo-oracle teacher-selection target before student
+training begins. Freezing the selector then turns teacher choice into a stable
+source of training-time supervision. This separation is the main reason the
+method is more reliable than jointly learned routing gates in the current
+experiments.
+
+At the same time, the results show that selector accuracy alone is not the
+same as student usefulness. A selector can correctly identify the teacher with
+the lowest sample-level pseudo-oracle error, but the ECFP-only student may not
+benefit equally from imitating that teacher. This explains why the method can
+outperform base and fixed distillation while still only marginally trailing
+the strong `top1_validation` baseline. The result should therefore be read as
+evidence that selector supervision is a useful missing ingredient, not as
+evidence that sample-level routing has fully solved teacher reliability.
+
+The high-resource lambda experiment further clarifies the optimization side of
+the problem. Once more labeled data are available, forcing the student to
+imitate routed teachers with the same strength used in lower-resource regimes
+can become harmful. Reducing distillation strength at the 50% train ratio
+improves the selector variant from 5.0889 to 5.0814 mean RMSE and nearly
+matches `top1_validation`. However, weakening teacher supervision earlier is
+not robust. This suggests that future work should model teacher strength as a
+separate calibrated quantity rather than folding it into teacher identity.
+
+Descriptor-access RF/XGB teachers remain important controls. In several
+settings, descriptor-access models or setting-level teacher choices still
+match or exceed the ECFP-only student. The contribution of this work is not to
+claim that ECFP-only inference universally dominates descriptor-access
+prediction. Instead, it targets a deployment constraint: the student can use
+descriptors and teacher predictions during training, but needs only ECFP4 at
+inference. This distinction is practical for workflows where descriptor
+pipelines, teacher ensembles, or larger molecular models are inconvenient to
+run at deployment time.
+
+Finally, the current method uses RF teachers because they provide a controlled
+first test of supervised teacher selection. The same framework naturally
+extends to stronger molecular experts, including XGBoost ensembles,
+message-passing neural networks, and pretrained molecular models. Such
+teachers may increase the value of selector routing, but they should be added
+after the reliability and routing protocol is fixed; otherwise, improved
+performance could be difficult to attribute to teacher quality versus
+selection quality.
 
 ## 8. Limitations
 
-Planned limitations:
+This study has several limitations. First, the main claim is restricted to
+regression ADMET endpoints. Classification endpoints were explored in the
+pilot work but were less stable, and they should remain supplementary until
+the teacher-selection protocol is evaluated under classification-specific
+metrics and calibration behavior.
 
-- main claim is regression-focused;
-- classification remains supplementary unless stabilized;
-- RF/XGB teachers are not the full space of molecular teachers;
-- reliability features are partly hand-designed in the first version;
-- student may still underperform descriptor-access teachers.
+Second, the teacher set is deliberately limited. The main experiments use RF
+teachers over ECFP4, RDKit descriptors, and their concatenation. This isolates
+the teacher-selection problem, but it does not cover the full range of
+molecular experts available in drug discovery. Adding XGBoost, graph neural
+networks, or pretrained molecular encoders may change both the attainable
+student performance and the difficulty of selecting among teachers.
+
+Third, the selector features are partly hand-designed. Teacher uncertainty,
+teacher consensus deviation, validation priors, and descriptor-space coverage
+are interpretable and effective enough to predict pseudo-oracle teacher
+labels, but they may not be optimal. Learned reliability representations or
+meta-learned selector features could improve selection quality, especially in
+endpoints where the current selector is close to chance.
+
+Fourth, the pseudo-oracle labels are based on teacher absolute error on
+cross-fit predictions. This avoids direct leakage from fitting and evaluating
+on the same samples, but it is still an imperfect proxy for the teacher that
+will most improve the downstream student. The failure analysis suggests that
+sample-level teacher correctness and student-level distillation benefit can
+diverge.
+
+Fifth, the calibrated high-resource lambda schedule is heuristic. It is useful
+because it captures a clear pattern in the experiments, but it is not a fully
+learned solution to teacher-strength calibration. A more principled version
+would estimate both teacher identity and distillation strength from validation
+or cross-fit evidence without hand-coding train-ratio thresholds.
+
+Finally, the proposed ECFP-only student still does not always match the best
+descriptor-access control. This is an expected limitation under the inference
+constraint. The method is most relevant when training-time teacher knowledge
+is available but deployment should remain lightweight and fingerprint-only.
