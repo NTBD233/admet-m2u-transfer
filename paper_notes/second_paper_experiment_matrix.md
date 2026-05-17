@@ -2,10 +2,12 @@
 
 ## Goal
 
-Before training the full high-venue method, prove that teacher reliability is
-non-uniform across tasks, train ratios, and samples. Then compare the proposed
-reliability-gated conflict-aware method against fixed and naive multi-teacher
-distillation baselines.
+Support the second paper's current main claim: teacher selection for
+multi-teacher distillation should be supervised before student training, then
+frozen for ECFP-only low-resource ADMET routing. The experiment matrix should
+show that teacher reliability is non-uniform across tasks, train ratios, and
+samples; naive joint gates are unstable; and a pretrained RF selector provides
+a stable routing signal.
 
 ## Fixed Experimental Scope
 
@@ -16,6 +18,26 @@ Datasets:
 - `solubility_aqsoldb`
 - `vdss_lombardo`
 - `ppbr_az`
+
+Selection rationale:
+
+- regression-only main scope, so selector labels, distillation loss, and metric
+  are all aligned around RMSE;
+- endpoint coverage spans absorption/permeability, physicochemical properties,
+  and distribution/binding;
+- all endpoints have prepared 10/20/50 train-ratio features for three seeds;
+- describe this as "representative regression ADMET", not all ADMET.
+
+Supplementary classification diagnostics:
+
+- `bbb_martins`
+- `hia_hou`
+- `pgp_broccatelli`
+- `bioavailability_ma`
+- `herg`
+
+Use these only for selector predictability and failure analysis until the
+classification student-routing protocol is stable.
 
 Train ratios:
 
@@ -44,18 +66,22 @@ Inference rule:
 
 ## Teacher Set
 
-First-round teachers:
+Formal first-round teachers:
 
 - `ECFP4_RF`
 - `Desc_RF`
 - `ECFP4_Desc_RF`
+
+Deferred teacher expansions:
+
 - `ECFP4_XGB`
 - `Desc_XGB`
 - `ECFP4_Desc_XGB`
+- Chemprop D-MPNN or another graph/pretrained molecular teacher
 
-Deferred teacher:
-
-- Chemprop D-MPNN, only after RF/XGB reliability diagnostics are stable.
+Do not block the main RF-only selector paper on XGB or graph teachers. They are
+strong reviewer-facing extensions after the supervised selector protocol is
+stable.
 
 ## Stage 1: Teacher Reliability Diagnostics
 

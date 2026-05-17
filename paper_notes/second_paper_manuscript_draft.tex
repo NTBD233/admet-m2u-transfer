@@ -215,7 +215,13 @@ endpoints: \texttt{caco2\_wang}, \texttt{lipophilicity\_astrazeneca},
 \texttt{ppbr\_az}. These endpoints are drawn from the TDC and MoleculeNet
 style molecular property benchmark ecosystem \cite{Wu2018MoleculeNet,Huang2021TDC};
 for solubility, \texttt{solubility\_aqsoldb} traces to the AqSolDB resource
-\cite{Sorkun2019AqSolDB}. For each endpoint, we use 10\%, 20\%, and 50\% training
+\cite{Sorkun2019AqSolDB}. We choose regression endpoints for the main study to
+keep the selector target, distillation loss, and evaluation metric within a
+single metric family. The selected endpoints cover absorption or permeability
+(\texttt{caco2\_wang}), physicochemical properties (lipophilicity and
+solubility), and distribution or binding (\texttt{vdss\_lombardo} and
+\texttt{ppbr\_az}).
+For each endpoint, we use 10\%, 20\%, and 50\% training
 ratios with seeds 42, 123, and 3407, giving 45 dataset-ratio-seed settings.
 The primary metric is test RMSE. Validation splits are used for teacher-prior
 estimation, model selection, and setting-level teacher baselines, but the
@@ -437,20 +443,28 @@ work but were less stable, and they should remain supplementary until the
 teacher-selection protocol is evaluated under classification-specific metrics
 and calibration behavior.
 
-Second, the teacher set is deliberately limited. The main experiments use RF
+Second, the main dataset scope is deliberately restricted to regression
+endpoints. This avoids mixing RMSE-based selector labels with
+classification-specific calibration and ROC-AUC behavior, but it means the
+current claim should be read as regression ADMET evidence rather than a complete
+ADMET benchmark. Prepared classification endpoints such as blood-brain barrier
+permeability, human intestinal absorption, P-gp interaction, bioavailability,
+and hERG inhibition are natural supplementary diagnostics.
+
+Third, the teacher set is deliberately limited. The main experiments use RF
 teachers over ECFP4, descriptors, and their concatenation. This isolates the
 teacher-selection problem, but it does not cover the full range of molecular
 experts available in drug discovery. Adding XGBoost, graph neural networks, or
 pretrained molecular encoders may change both the attainable student
 performance and the difficulty of selecting among teachers.
 
-Third, the selector features are partly hand-designed. Teacher uncertainty,
+Fourth, the selector features are partly hand-designed. Teacher uncertainty,
 teacher consensus deviation, validation priors, and descriptor-space coverage
 are interpretable and effective enough to predict pseudo-oracle teacher labels,
 but they may not be optimal. Learned reliability representations or
 meta-learned selector features could improve selection quality.
 
-Fourth, the pseudo-oracle labels are based on teacher absolute error on
+Fifth, the pseudo-oracle labels are based on teacher absolute error on
 cross-fit predictions. This avoids direct leakage from fitting and evaluating
 on the same samples, but it is still an imperfect proxy for the teacher that
 will most improve the downstream student.
