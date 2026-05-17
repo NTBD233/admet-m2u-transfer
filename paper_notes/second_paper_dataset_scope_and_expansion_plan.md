@@ -47,9 +47,11 @@ classification endpoints:
 | `bioavailability_ma` | classification | oral bioavailability | 643 |
 | `herg` | classification | cardiotoxicity / ion-channel liability | 658 |
 
-These should not be promoted to the main claim yet because earlier
-classification behavior was unstable. They are useful as supplementary
-diagnostics:
+These should not be promoted to the main claim yet because classification
+selector behavior is unstable. A completed 45-setting RF selector diagnostic
+gave 0.2162 mean test oracle-teacher accuracy and 0.1766 mean test macro-F1,
+below the train-majority baseline of 0.2958 test accuracy. They are useful as
+negative supplementary diagnostics:
 
 - Can the RF selector predict pseudo-oracle teacher labels under ROC-AUC tasks?
 - Are teacher reliability features still informative?

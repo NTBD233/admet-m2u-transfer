@@ -441,7 +441,11 @@ This study has several limitations. First, the main claim is restricted to
 regression ADMET endpoints. Classification endpoints were explored in pilot
 work but were less stable, and they should remain supplementary until the
 teacher-selection protocol is evaluated under classification-specific metrics
-and calibration behavior.
+and calibration behavior. In a five-endpoint classification diagnostic, the
+same RF selector obtained only 0.2162 mean test oracle-teacher accuracy, below
+the corresponding train-majority baseline of 0.2958, indicating that the
+regression pseudo-oracle protocol should not be transferred directly to
+classification tasks.
 
 Second, the main dataset scope is deliberately restricted to regression
 endpoints. This avoids mixing RMSE-based selector labels with

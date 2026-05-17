@@ -17,24 +17,62 @@ from analyze_teacher_reliability import (
     descriptor_ood_distances,
     load_prediction,
 )
-from train import load_teacher_valid_metrics
-from utils.config import PROJECT_ROOT, RESULTS_ROOT, SEEDS, TRAIN_RATIO_TAGS
+from utils.config import DATASETS, PROJECT_ROOT, RESULTS_ROOT, SEEDS, TRAIN_RATIO_TAGS
 from utils.summary import dataframe_to_markdown
 
 
 DEFAULT_TEACHERS = ["ECFP4_RF", "Desc_RF", "ECFP4_Desc_RF"]
 
 
+def load_teacher_valid_metric(teacher_root, dataset_name, teacher_model, train_ratio_tag, seed, metric):
+    teacher_path = (
+        Path(teacher_root)
+        / dataset_name
+        / teacher_model
+        / f"train_{train_ratio_tag}"
+        / f"seed_{seed}"
+        / "valid_teacher_predictions.npz"
+    )
+    if not teacher_path.exists():
+        raise FileNotFoundError(f"Missing validation teacher predictions: {teacher_path}")
+    teacher_data = np.load(teacher_path, allow_pickle=True)
+    metrics = teacher_data["metrics"][0]
+    return float(metrics[metric])
+
+
+def load_teacher_valid_metrics(teacher_root, dataset_name, teacher_models, train_ratio_tag, seed, metric):
+    return {
+        teacher_model: load_teacher_valid_metric(
+            teacher_root=teacher_root,
+            dataset_name=dataset_name,
+            teacher_model=teacher_model,
+            train_ratio_tag=train_ratio_tag,
+            seed=seed,
+            metric=metric,
+        )
+        for teacher_model in teacher_models
+    }
+
+
 def build_prior_weight_map(teacher_root, dataset, teachers, ratio, seed):
+    cfg = DATASETS[dataset]
+    metric = cfg["main_metric"]
+    higher_is_better = cfg["higher_is_better"]
     valid_metrics = load_teacher_valid_metrics(
         teacher_root=teacher_root,
         dataset_name=dataset,
         teacher_models=teachers,
         train_ratio_tag=ratio,
         seed=seed,
-        metric="rmse",
+        metric=metric,
     )
-    scores = np.asarray([-valid_metrics[name] for name in teachers], dtype=np.float32)
+    scores = np.asarray(
+        [
+            valid_metrics[name] if higher_is_better else -valid_metrics[name]
+            for name in teachers
+        ],
+        dtype=np.float32,
+    )
     shifted = scores - scores.max()
     weights = np.exp(shifted)
     weights = weights / weights.sum()

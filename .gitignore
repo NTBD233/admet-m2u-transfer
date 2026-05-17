@@ -10,6 +10,7 @@ data/prepared_data/
 data/prepared_data_subsample/
 data/features_m2u/
 data/teacher_predictions/
+data/selector_predictions/
 
 results/*
 !results/.gitkeep

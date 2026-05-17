@@ -1,14 +1,23 @@
 from pathlib import Path
 
 import numpy as np
-import torch
-from torch.utils.data import DataLoader, Dataset
+try:
+    import torch
+    from torch.utils.data import DataLoader, Dataset
+except ModuleNotFoundError:
+    torch = None
+    DataLoader = None
+
+    class Dataset:
+        pass
 
 from utils.config import BATCH_SIZE, FEATURE_ROOT, TRAIN_RATIO_TAG
 
 
 class M2UFeatureDataset(Dataset):
     def __init__(self, npz_path, task_type, teacher_path=None, teacher_paths=None, selector_path=None):
+        if torch is None:
+            raise ModuleNotFoundError("torch is required to build M2UFeatureDataset loaders.")
         data = np.load(npz_path, allow_pickle=True)
 
         self.X_fp = torch.tensor(data["X_fp"], dtype=torch.float32)
@@ -118,6 +127,8 @@ def make_loaders(
     selector_model_name=None,
     seed=None,
 ):
+    if torch is None or DataLoader is None:
+        raise ModuleNotFoundError("torch is required to build data loaders for neural training.")
     train_path, valid_path, test_path = feature_paths(
         dataset_name=dataset_name,
         feature_root=feature_root,
