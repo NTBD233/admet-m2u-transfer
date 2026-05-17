@@ -238,29 +238,177 @@ aggregate.
 
 ## 5. Results
 
-Placeholder until experiments are complete.
+### 5.1 Main Regression Results
 
-Required result blocks:
+Table 1 summarizes the full regression matrix over five ADMET endpoints, three
+train ratios, and three random seeds. The base ECFP-only AdapterFusion student
+obtains a mean test RMSE of 5.1841. Fixed single-teacher distillation from the
+descriptor-access `ECFP4_Desc_RF` teacher improves this to 5.1621, confirming
+the pilot observation that descriptor-informed teacher supervision can benefit
+an ECFP-only student. However, the gain is modest, and fixed teacher
+distillation still loses to stronger multi-teacher selection strategies.
 
-- main RMSE comparison;
-- aggregate win counts;
-- mean RMSE deltas;
-- per-dataset discussion;
-- comparison against descriptor-access controls without overclaiming.
+Uniform multi-teacher distillation improves mean test RMSE to 5.1403, while
+validation-weighted multi-teacher distillation improves it further to 5.0969.
+This shows that multiple molecular teachers contain complementary information,
+but also that simple averaging is insufficient. The best setting-level
+baseline is `top1_validation`, which selects the single teacher with the best
+validation RMSE for each dataset-ratio-seed setting and reaches 5.0792 mean
+test RMSE.
+
+The proposed pretrained selector with frozen top-1 routing reaches 5.0889 mean
+test RMSE. It improves over base AdapterFusion in 34 of 45 runs and over fixed
+single-teacher distillation in 28 of 45 runs, with mean deltas of -0.0953 and
+-0.0732 RMSE, respectively. Compared with `top1_validation`, the selector wins
+25 of 45 runs but remains slightly worse on average by +0.0096 RMSE. Thus, the
+selector closes most of the gap between unstable joint routing and the
+strongest setting-level teacher selector, but it does not decisively dominate
+the setting-level baseline.
+
+Adding high-resource lambda decay further improves the pretrained selector.
+This calibrated variant keeps the original distillation strength at 10% and
+20% train ratios, but reduces teacher forcing at 50% train ratio. It reaches
+5.0814 mean test RMSE, improves over fixed distillation in 32 of 45 runs, and
+improves over the plain pretrained selector on mean RMSE by -0.0075. It also
+wins against `top1_validation` in 27 of 45 runs, although its aggregate mean
+remains marginally higher than `top1_validation` by +0.0021 RMSE. We therefore
+treat high-resource decay as a useful calibration of selector routing rather
+than as a separate main contribution.
+
+Overall, the main result supports a restrained claim: teacher-selector
+supervision makes sample-level routing competitive with strong setting-level
+teacher selection, and the remaining performance gap is small enough to
+motivate mechanism analysis rather than another purely heuristic routing rule.
+
+### 5.2 Dataset And Train-Ratio Behavior
+
+The dataset-ratio table shows that the benefit of selector routing is not
+uniform. On `caco2_wang`, the pretrained selector is strongest at 10% and 20%
+train ratios, while high-resource decay substantially improves the 50% setting
+relative to the plain selector. The same high-resource pattern appears on
+`ppbr_az`, where the calibrated selector improves the 50% setting from
+14.4500 to 14.3472 mean RMSE and beats `top1_validation` at that ratio.
+
+For `lipophilicity_astrazeneca`, pretrained selector routing is strongest at
+20%, while the 50% setting is still best served by fixed descriptor-access
+teacher distillation. For `solubility_aqsoldb`, the differences among uniform
+multi-teacher, top-1 validation, and selector routing are small; high-resource
+decay is essentially neutral. For `vdss_lombardo`, base AdapterFusion remains
+competitive in the 20% and 50% settings, and high-resource decay slightly
+weakens the plain selector at 50%. This endpoint therefore remains a useful
+counterexample: not every dataset benefits from more teacher forcing control,
+and selective distillation should be evaluated against a strong non-distilled
+student.
+
+These endpoint differences are important for the paper's central argument.
+They show that teacher selection is not reducible to a single globally best
+teacher or a single globally best weighting rule. The optimal behavior depends
+on the endpoint and the resource regime, which motivates both selector
+pretraining and the analysis of when the selected teacher should be enforced
+strongly.
+
+### 5.3 Negative And Secondary Ablations
+
+Several alternatives were tested before settling on pretrained selector
+routing. Joint learned gates and supervised joint gates were weak in smoke
+experiments, indicating that simply adding a routing network to the student
+does not provide a stable teacher-selection signal. Selector-confidence
+auto-reweighting was reproducible and locally useful, but on the 18-run
+`caco2_wang` + `ppbr_az` partial regression subset it increased mean RMSE from
+8.6091 to 8.7875 relative to the plain selector. The route-mode audit reached
+the same conclusion: the auto rule won against plain selector in only 7 of 18
+settings and had a positive mean delta of +0.1784 RMSE.
+
+The ratio-aware lambda analysis gives a more useful secondary result. Early
+lambda decay, which reduces distillation strength already at the 20% train
+ratio, is harmful on the same partial subset. High-resource decay is more
+defensible because it leaves 10% and 20% settings unchanged and only weakens
+teacher forcing at 50%. On the full matrix, this improves the plain selector
+from 5.0889 to 5.0814 mean RMSE. This supports the view that teacher choice
+and teacher strength are related but distinct problems: selecting a better
+teacher is necessary, but enforcing that teacher too strongly can still harm
+the student when more labeled data are available.
 
 ## 6. Mechanism Analysis
 
-Placeholder until diagnostics are complete.
+### 6.1 Teacher Selection Is Predictable
 
-Required analyses:
+The first mechanism question is whether teacher selection contains learnable
+signal at all. A leave-one-setting-out diagnostic was run using teacher
+uncertainty, teacher consensus deviation, validation-derived teacher priors,
+and descriptor-space coverage features. The random-forest gate probe reaches a
+weighted oracle-teacher accuracy of 0.5617 across 45 held-out settings. This
+substantially exceeds both the global majority baseline (0.4818) and the
+setting-level `top1_validation` prior (0.4360). A logistic probe also beats
+these baselines with 0.5044 weighted accuracy, but is clearly weaker than the
+random-forest probe.
 
-- teacher weight heatmap;
-- teacher conflict vs gain;
-- uncertainty-error correlation;
-- OOD distance vs gate weight;
-- failure-case table;
-- selector confidence calibration;
-- validation route audit for setting-aware reweight decisions.
+This diagnostic is central to the method design. It shows that the failure of
+joint gates is not caused by teacher reliability being random or unobservable.
+Instead, the issue is how the teacher-selection signal is supervised and how it
+is coupled to student optimization. This motivates separating selector
+pretraining from student distillation.
+
+### 6.2 Selector Quality Across Endpoints
+
+The pretrained random-forest selector remains noisy, but its quality is stable
+across the full regression matrix. Averaged over 45 dataset-ratio-seed
+settings, it obtains 0.5178 validation accuracy and 0.5425 test accuracy, with
+validation and test macro-F1 of 0.4269 and 0.4396. These numbers are not high
+enough to treat the selector as an oracle, but they are sufficient to route
+useful supervision into the student.
+
+Selector predictability varies by endpoint. Test accuracy is highest on
+`solubility_aqsoldb` (0.5692) and `vdss_lombardo` (0.5546), followed by
+`ppbr_az` (0.5450) and `caco2_wang` (0.5354). It is lowest on
+`lipophilicity_astrazeneca` (0.5083), although the selector still performs
+competitively in the student-level experiments for that endpoint. This
+separation between selector accuracy and student gain is important: predicting
+the pseudo-oracle teacher is useful, but the final RMSE also depends on how
+well the ECFP-only student can absorb the selected teacher's signal.
+
+### 6.3 Why Pretraining Helps More Than Joint Routing
+
+Joint routing gates attempt to learn task prediction and teacher selection
+simultaneously from low-resource supervision. In this setting, the task loss
+can suppress teacher-selection behavior before the gate has learned a stable
+notion of teacher reliability. The supervised joint-gate smoke results confirm
+this failure mode: adding a gate classification loss did not substantially
+improve regression RMSE. By contrast, cross-fit selector pretraining creates an
+explicit pseudo-oracle target before the student is trained, and frozen routing
+prevents the selector from collapsing toward whichever teacher happens to
+reduce early training loss.
+
+This explains why the proposed method should be framed as supervised teacher
+selection rather than generic adaptive weighting. The contribution is not that
+a more flexible gate is added to the student, but that teacher selection is
+given its own supervision signal and then used as a fixed training-time
+routing mechanism.
+
+### 6.4 Remaining Failure Modes
+
+The remaining gap to `top1_validation` is small but informative. First, some
+settings are still better handled by a coarse setting-level teacher choice.
+For example, `ppbr_az` at 20% train ratio strongly favors `top1_validation`,
+while the selector remains weaker despite strong average selector accuracy on
+that endpoint. This suggests that selector correctness against sample-level
+pseudo-oracle labels is not always aligned with the student-level RMSE gained
+from routed distillation.
+
+Second, the high-resource lambda results show that teacher strength matters
+even after teacher choice is fixed. At 50% train ratio, reducing distillation
+strength improves the calibrated selector mean RMSE from 4.6001 to 4.5774
+across datasets. At 10% and 20%, the calibrated method intentionally matches
+the plain selector, because early weakening of teacher supervision hurt the
+partial-regression results. The mechanism is therefore two-dimensional:
+students need to know which teacher to imitate and how strongly to imitate it
+under a given data regime.
+
+Finally, descriptor-access models remain strong controls. The proposed method
+does not claim that an ECFP-only student always replaces descriptor-access
+teachers. Its contribution is narrower and more deployable: descriptor and
+teacher knowledge can be transferred during training, while inference remains
+ECFP-only.
 
 ## 7. Discussion
 
