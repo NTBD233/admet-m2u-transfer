@@ -2,17 +2,29 @@
 
 ## Abstract
 
-Placeholder. Write this after Stage 1 diagnostics and Stage 3 main results are
-available.
-
-Must include:
-
-- low-resource regression ADMET motivation;
-- ECFP-only inference constraint;
-- fixed distillation and naive adaptive weighting limitations from the pilot;
-- pretrained teacher selection plus frozen routing distillation;
-- main RMSE result;
-- mechanism analysis result.
+Low-resource ADMET prediction can benefit from molecular knowledge encoded in
+physicochemical descriptors and classical teacher models, but many deployment
+settings still favor lightweight ECFP-only inference. Prior descriptor-teacher
+distillation improves ECFP-only students in some regression settings, yet fixed
+distillation weights and jointly learned routing gates are unstable because
+they do not provide a reliable supervision signal for deciding which teacher
+to trust. We propose pretrained teacher selection for multi-teacher
+distillation, a two-stage framework that first trains a standalone teacher
+selector from cross-fit pseudo-oracle labels and then freezes the selector to
+route teacher supervision into an ECFP-only AdapterFusion student. The selector
+uses teacher uncertainty, consensus deviation, validation-derived priors, and
+descriptor-space coverage features to predict which molecular expert should
+supervise each sample. Across five regression ADMET endpoints, three train
+ratios, and three random seeds, pretrained selector routing improves mean test
+RMSE over base AdapterFusion (5.0889 vs 5.1841) and fixed descriptor-teacher
+distillation (5.0889 vs 5.1621), while approaching the strongest setting-level
+teacher-selection baseline (5.0792). A calibrated high-resource distillation
+schedule further narrows this gap to 5.0814 mean RMSE. Mechanism analyses show
+that teacher selection is predictable: a random-forest reliability probe
+achieves 0.5617 weighted oracle-teacher accuracy, outperforming majority and
+setting-prior baselines. These results indicate that selector supervision, not
+generic adaptive weighting, is a key ingredient for reliable ECFP-only
+multi-teacher ADMET distillation.
 
 ## 1. Introduction
 
@@ -44,14 +56,16 @@ selector to route teacher supervision into an ECFP-only AdapterFusion student.
 Contributions:
 
 1. We formulate ECFP-only low-resource ADMET prediction as a selective
-   teacher-reliability distillation problem.
+   teacher-selection distillation problem under a training-time teacher,
+   inference-time ECFP-only constraint.
 2. We show that oracle best-teacher labels are predictable from teacher
    uncertainty, consensus deviation, validation priors, and descriptor-space
    coverage, while jointly learned routing gates remain unstable.
-3. We propose cross-fit selector pretraining plus frozen top-1 routing, with
-   selector-based filtering as a simplified companion variant.
-4. We evaluate the method on regression ADMET datasets and analyze which
-   teachers are selected across endpoints, train ratios, and chemical regions.
+3. We propose cross-fit selector pretraining plus frozen top-1 routing, and
+   study train-ratio-aware distillation strength as a secondary calibration.
+4. We evaluate the method on five regression ADMET datasets and analyze why
+   selector correctness, teacher strength, and student usefulness are related
+   but distinct factors.
 
 ## 2. Problem Formulation
 
