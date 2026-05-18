@@ -5,6 +5,7 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\hypersetup{hidelinks}
 \usepackage{url}
 
 \title{Pretrained Teacher Selection for Reliable Multi-Teacher Distillation in Low-Resource ADMET}
@@ -149,6 +150,16 @@ coverage. The selector is trained first, then frozen, and finally used to route
 teacher distillation while keeping inference ECFP-only.
 
 \section{Method}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../paper_figures_second/fig1_selector_method.pdf}
+\caption{Overview of pretrained teacher selection with frozen routing
+distillation. During training, RF teachers and reliability signals supervise a
+standalone selector; the frozen selector routes teacher supervision into an
+ECFP-only AdapterFusion student. At inference, only ECFP4 is used.}
+\label{fig:method}
+\end{figure}
 
 \subsection{ECFP-only AdapterFusion student}
 
@@ -314,6 +325,16 @@ method minus reference, so negative values indicate improvement.}
 \label{tab:main}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.88\linewidth]{../paper_figures_second/fig2_main_rmse.pdf}
+\caption{Aggregate mean test RMSE across 45 regression settings. The
+pretrained selector improves over base AdapterFusion and fixed single-teacher
+distillation, while high-resource decay nearly matches the strong
+\texttt{top1\_validation} baseline.}
+\label{fig:main_rmse}
+\end{figure}
+
 Table~\ref{tab:main} summarizes the full regression matrix. The base ECFP-only
 AdapterFusion student obtains a mean test RMSE of 5.1841. Fixed single-teacher
 distillation from the descriptor-access \texttt{ECFP4\_Desc\_RF} teacher
@@ -358,6 +379,16 @@ competitive in the 20\% and 50\% settings, and high-resource decay slightly
 weakens the plain selector at 50\%. These endpoint differences show that
 teacher selection is not reducible to a single globally best teacher or a
 single globally best weighting rule.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../paper_figures_second/fig3_setting_delta_heatmap.pdf}
+\caption{Dataset-ratio behavior of the calibrated selector. Each cell reports
+the RMSE delta of selector plus high-resource decay relative to
+\texttt{top1\_validation}; negative values favor the selector. Text inside
+each cell shows the best method for that dataset-ratio setting.}
+\label{fig:setting_delta}
+\end{figure}
 
 \subsection{Negative and secondary ablations}
 
@@ -420,6 +451,16 @@ Setting-prior top-1 weighted accuracy & 45 leave-one-setting-out groups & 0.4360
 \caption{Selector predictability diagnostics.}
 \label{tab:selector_diagnostics}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../paper_figures_second/fig4_selector_quality.pdf}
+\caption{Selector quality diagnostics. Left: regression selector accuracy and
+macro-F1 by endpoint. Right: the same selector protocol fails on classification
+diagnostics, where test oracle-teacher accuracy is below the train-majority
+baseline.}
+\label{fig:selector_quality}
+\end{figure}
 
 The first mechanism question is whether teacher selection contains learnable
 signal at all. Table~\ref{tab:selector_diagnostics} shows that a
