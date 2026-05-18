@@ -86,6 +86,46 @@ The contributions are:
   related but distinct factors.
 \end{itemize}
 
+\section{Related Work}
+
+\paragraph{Molecular property prediction and ADMET benchmarks.}
+Molecular property prediction has progressed from fingerprint- and
+descriptor-based models to graph neural networks and pretrained molecular
+encoders. ECFP fingerprints remain a strong and lightweight baseline
+\cite{Rogers2010}, while descriptor and tree-based models are widely used in
+practical cheminformatics \cite{Breiman2001,Chen2016XGBoost,Tian2022ADMETBoost}.
+Graph-based models such as D-MPNN, graph transformers, and geometry-aware
+pretraining improve molecular representation learning in many settings
+\cite{Yang2019DMPNN,Rong2020GROVER,Hu2020PretrainGNN,Liu2022GraphMVP}. ADMET
+benchmarking resources and platforms, including MoleculeNet, TDC, ADMETlab,
+and ADMET-AI, make these comparisons more reproducible
+\cite{Wu2018MoleculeNet,Huang2021TDC,Xiong2021ADMETlab,Swanson2024ADMETAI}.
+Our work does not propose a new molecular encoder; it studies how an ECFP-only
+student can selectively absorb descriptor-access teacher knowledge during
+training.
+
+\paragraph{Multi-view and auxiliary molecular learning.}
+Recent molecular learning work shows that multiple molecular views and
+auxiliary tasks can help, but their utility varies by endpoint and data regime.
+MolFuse studies cross-view fusion for molecular property prediction
+\cite{Zheng2024MolFuse}, while MTGL-ADMET and task-specific auxiliary learning
+show that auxiliary supervision should be selected rather than used uniformly
+\cite{Du2023MTGLADMET,Dey2024AuxAdapt}. This motivates our central framing:
+descriptor, fingerprint, and descriptor-access teachers should not be averaged
+blindly under low-resource ADMET.
+
+\paragraph{Knowledge distillation and teacher selection.}
+Knowledge distillation transfers information from a teacher into a student
+\cite{Hinton2015}. Multi-teacher distillation extends this idea but introduces
+a selection problem: different teachers can be reliable on different samples.
+Prior work has explored mixture-of-experts routing and multi-teacher selection
+\cite{Jacobs1991MoE,Shi2021ReinforcedMTS,Liu2021AdaptiveMTKD,Zhang2022CAMKD}.
+Molecular distillation has also begun to explore cross-view transfer, including
+MolKD for reaction-to-molecule knowledge transfer \cite{Zeng2024MolKD}. Our
+contribution is narrower and ADMET-specific: we pretrain a teacher selector
+from cross-fit pseudo-oracle labels, freeze it, and use it to route
+multi-teacher supervision into an ECFP-only student.
+
 \section{Problem Formulation}
 
 Let \(x\) denote a molecule, \(f(x)\) its ECFP4 fingerprint, \(d(x)\) its
@@ -321,8 +361,28 @@ single globally best weighting rule.
 
 \subsection{Negative and secondary ablations}
 
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llrrr}
+\toprule
+Method & Scope & RMSE & Wins & \(\Delta\) Plain \\
+\midrule
+Plain selector & 18 runs & 8.6091 & -- & -- \\
+Auto confidence reweight & 18 runs & 8.7875 & 7/18 & 0.1783 \\
+Low-resource decay & 18 runs & 8.6666 & 7/18 & 0.0575 \\
+High-resource decay & 18 runs & 8.5852 & 5/18 & -0.0239 \\
+\bottomrule
+\end{tabular}
+\caption{Secondary ablations on the \texttt{caco2\_wang} and \texttt{ppbr\_az}
+partial regression subset. Wins are counted against the plain pretrained
+selector. Negative deltas indicate lower mean RMSE than the plain selector.}
+\label{tab:secondary_ablation}
+\end{table}
+
 Several alternatives were tested before settling on pretrained selector
-routing. Joint learned gates and supervised joint gates were weak in smoke
+routing. Table~\ref{tab:secondary_ablation} summarizes the main secondary
+ablations. Joint learned gates and supervised joint gates were weak in smoke
 experiments, indicating that simply adding a routing network to the student
 does not provide a stable teacher-selection signal. Selector-confidence
 auto-reweighting was reproducible and locally useful, but on the 18-run
