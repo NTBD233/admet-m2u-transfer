@@ -280,6 +280,35 @@ estimation, model selection, and setting-level teacher baselines, but the
 pretrained selector's formal supervision comes from cross-fit pseudo-oracle
 labels within the training split.
 
+\subsection{Implementation details}
+
+All neural students use ECFP4 fingerprints with radius 2 and 2048 bits as the
+only inference-time molecular input. The descriptor reconstruction branch uses
+nine RDKit descriptors: molecular weight, LogP, TPSA, hydrogen-bond acceptors,
+hydrogen-bond donors, rotatable bonds, aromatic rings, heavy atoms, and ring
+count. Students are trained with Adam using a learning rate of \(5\times
+10^{-4}\), weight decay \(10^{-5}\), batch size 64, at most 200 epochs, and
+early stopping with patience 30 on validation RMSE. Unless otherwise stated,
+the descriptor reconstruction weight is 0.1 and the multi-teacher distillation
+weight is 1.0.
+
+The RF teachers are trained on the same labeled training split as the student
+and differ only in molecular view: \texttt{ECFP4\_RF}, \texttt{Desc\_RF}, and
+\texttt{ECFP4\_Desc\_RF}. Each RF regressor uses 500 trees and square-root
+feature subsampling. The formal selector is an RF classifier trained from
+cross-fit pseudo-oracle labels. Its input contains per-teacher uncertainty,
+per-teacher consensus gap, per-teacher validation prior weight, and a shared
+descriptor-space OOD distance. After selector pretraining, selector parameters
+are frozen during student distillation.
+
+We enforce leakage control at the label-construction stage. For every
+dataset-ratio-seed setting, selector labels are generated inside the training
+split using \(K\)-fold out-of-fold teacher predictions. Thus, a training sample's
+pseudo-oracle teacher is determined only by teachers that did not fit that
+sample in the corresponding fold. Validation and test examples are not used to
+construct selector supervision; validation predictions are used only for model
+selection, teacher-prior estimation, and validation-selected baselines.
+
 \subsection{Baselines}
 
 We compare against several levels of teacher use. The first baseline is the
@@ -304,7 +333,7 @@ diagnostic negative result.
 
 \subsection{Main regression results}
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \small
 \setlength{\tabcolsep}{3pt}
