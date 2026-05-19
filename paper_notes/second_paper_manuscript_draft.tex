@@ -401,6 +401,7 @@ each cell shows the best method for that dataset-ratio setting.}
 Method & Scope & RMSE & Wins & \(\Delta\) Plain \\
 \midrule
 Plain selector & 18 runs & 8.6091 & -- & -- \\
+Validation-selected reweight & 18 runs & 8.6244 & 5/18 & 0.0153 \\
 Auto confidence reweight & 18 runs & 8.7875 & 7/18 & 0.1783 \\
 Low-resource decay & 18 runs & 8.6666 & 7/18 & 0.0575 \\
 High-resource decay & 18 runs & 8.5852 & 5/18 & -0.0239 \\
@@ -417,9 +418,13 @@ routing. Table~\ref{tab:secondary_ablation} summarizes the main secondary
 ablations. Joint learned gates and supervised joint gates were weak in smoke
 experiments, indicating that simply adding a routing network to the student
 does not provide a stable teacher-selection signal. Selector-confidence
-auto-reweighting was reproducible and locally useful, but on the 18-run
-\texttt{caco2\_wang} + \texttt{ppbr\_az} partial regression subset it
-increased mean RMSE from 8.6091 to 8.7875 relative to the plain selector.
+reweighting was reproducible and locally useful in specific failure cases, but
+it was not robust enough to become a main method. A validation-selected policy
+that chose among no reweighting, global confidence reweighting, and
+disagreement-only reweighting by validation RMSE improved mean validation RMSE
+relative to the plain selector (9.6038 vs. 9.6779), but did not improve mean
+test RMSE (8.6244 vs. 8.6091). The earlier auto-reweight rule was weaker still,
+increasing mean test RMSE to 8.7875 on the same subset.
 
 The ratio-aware lambda analysis gives a more useful secondary result. Early
 lambda decay, which reduces distillation strength already at the 20\% train
@@ -531,6 +536,18 @@ selector chooses the lower-error teacher it is nearly perfect. Yet the final
 student is still worse, with a +1.5003 absolute-error delta on that subset.
 This is a routing-utilization failure: better teacher choices are not reliably
 converted into better student predictions.
+
+A direct student-side sanity check supports this diagnosis but also explains
+why reweighting is not promoted to the main method. On the same
+\texttt{ppbr\_az} setting, global confidence reweighting reduces the selector
+gap to top-1 validation from +0.7527 to +0.3227 test RMSE and turns the
+sample-level mean absolute-error delta negative. On \texttt{caco2\_wang},
+disagreement-only reweighting improves the smoke test RMSE from 1.7337 to
+1.6957. However, selecting a reweight mode by validation RMSE across the
+18-run \texttt{caco2\_wang} + \texttt{ppbr\_az} subset does not improve test
+RMSE over the plain selector. Thus, student-side utilization is a real
+bottleneck, but low-resource validation is not yet sufficient for a stable
+reweight selection policy.
 
 The \texttt{caco2\_wang} probe shows the opposite pattern. There, the selector
 does not beat top-1 validation on teacher-selection accuracy over the
