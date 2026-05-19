@@ -3,6 +3,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{float}
 \usepackage{graphicx}
 \usepackage{hyperref}
 \hypersetup{hidelinks}
@@ -496,6 +497,49 @@ improves the calibrated selector mean RMSE from 4.6001 to 4.5774 across
 datasets. At 10\% and 20\%, the calibrated method intentionally matches the
 plain selector, because early weakening of teacher supervision hurt the
 partial-regression results.
+
+\subsection{Failure modes separate selection from utilization}
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llrrrrr}
+\toprule
+Setting & Subset & \(n\) & Sel. oracle & Top1 oracle & Sel. student wins & \(\Delta\) abs. err. \\
+\midrule
+\texttt{ppbr\_az} 20\% s42 & all & 559 & 0.5546 & 0.2576 & 0.3936 & +1.0748 \\
+\texttt{ppbr\_az} 20\% s42 & sel.-better teacher & 251 & 0.9801 & 0.0000 & 0.3307 & +1.5003 \\
+\texttt{caco2\_wang} 10\% s42 & all & 182 & 0.5714 & 0.5989 & 0.3736 & +0.0072 \\
+\texttt{caco2\_wang} 10\% s42 & sel.-better teacher & 17 & 0.6471 & 0.0000 & 0.5294 & -0.0126 \\
+\bottomrule
+\end{tabular}
+\caption{Failure-mode probes comparing teacher-selection correctness with
+student-level benefit. ``Sel.-better teacher'' denotes disagreement samples
+where the selector chooses a lower-error teacher than top-1 validation.
+\(\Delta\) abs. err. is selector-routed student absolute error minus
+top-1 validation student absolute error, so negative values favor the
+selector-routed student.}
+\label{tab:failure_probe}
+\end{table}
+
+Table~\ref{tab:failure_probe} separates two sources of the remaining gap. On
+\texttt{ppbr\_az} at 20\% train ratio, the selector is substantially better
+than top-1 validation at the teacher-selection problem itself
+(0.5546 vs. 0.2576 oracle accuracy), and on disagreement samples where the
+selector chooses the lower-error teacher it is nearly perfect. Yet the final
+student is still worse, with a +1.5003 absolute-error delta on that subset.
+This is a routing-utilization failure: better teacher choices are not reliably
+converted into better student predictions.
+
+The \texttt{caco2\_wang} probe shows the opposite pattern. There, the selector
+does not beat top-1 validation on teacher-selection accuracy over the
+full split, so the main bottleneck is selector quality. However, when the
+selector does choose a better teacher on the disagreement subset, the student
+effect is directionally positive. These probes support the central
+interpretation that supervised teacher selection is useful, but future gains
+require improving both selector quality and the way an ECFP-only student
+absorbs routed teacher supervision.
 
 \section{Discussion}
 
