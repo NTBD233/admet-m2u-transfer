@@ -79,7 +79,10 @@ Defense:
 
 1. Add a fixed-selector, student-side experiment for the `ppbr_az` failure mode:
    stronger selected-teacher distillation, delayed task-loss mixing, or
-   selector-confidence lambda scaling.
+   selector-confidence lambda scaling. A first sanity check now reproduces the
+   mechanism: `global_confidence` reweighting reduces the `ppbr_az / train_20 /
+   seed_42` test gap to `top1_validation` from `+0.7527` to `+0.3227`, and
+   turns the sample-level mean absolute-error delta negative.
 2. Add a compact XGBoost teacher-pool extension after the RF-only story is
    stable.
 3. For classification, redesign pseudo-oracle labels around ROC-AUC,
