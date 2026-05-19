@@ -107,3 +107,13 @@ loses to `top1_validation`:
 If validation-selected reweighting improves mean RMSE without hurting
 selector-stable settings, it can become a secondary method. Otherwise it should
 remain a mechanism analysis rather than a headline result.
+
+## Follow-Up Result
+
+The validation-selected policy was tested on `caco2_wang` and `ppbr_az` across
+all three train ratios and seeds. It improved mean validation RMSE over the
+plain selector (`9.6038` vs `9.6779`) but did not improve mean test RMSE
+(`8.6244` vs `8.6091`). It also remained worse than `top1_validation`
+(`8.5725`).
+
+Decision: keep reweighting as mechanism analysis, not as a main method.

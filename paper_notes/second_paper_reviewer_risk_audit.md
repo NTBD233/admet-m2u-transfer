@@ -82,7 +82,11 @@ Defense:
    selector-confidence lambda scaling. A first sanity check now reproduces the
    mechanism: `global_confidence` reweighting reduces the `ppbr_az / train_20 /
    seed_42` test gap to `top1_validation` from `+0.7527` to `+0.3227`, and
-   turns the sample-level mean absolute-error delta negative.
+   turns the sample-level mean absolute-error delta negative. However,
+   validation-selected reweighting over `plain_selector`, `global_confidence`,
+   and `disagreement_confidence` does not improve the 18-setting partial test
+   mean (`8.6244` vs `8.6091` for plain selector), so reweighting should remain
+   mechanism evidence rather than a main method.
 2. Add a compact XGBoost teacher-pool extension after the RF-only story is
    stable.
 3. For classification, redesign pseudo-oracle labels around ROC-AUC,
