@@ -1,0 +1,5 @@
+method,group,settings,mean_delta_vs_top1,mean_teacher_pred_range,mean_teacher_pred_std,mean_selector_top1_disagreement,mean_route_entropy,mean_selector_accuracy
+plain_selector,loses_top1,20,0.1132,2.2021,0.9463,0.4448,0.6761,0.5424
+plain_selector,wins_top1,25,-0.0732,1.996,0.8645,0.5183,0.6876,0.5426
+selector_decay,loses_top1,18,0.1401,2.1157,0.9121,0.4921,0.6872,0.5405
+selector_decay,wins_top1,27,-0.0899,2.0689,0.8934,0.4813,0.6794,0.5439

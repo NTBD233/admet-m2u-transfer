@@ -423,6 +423,37 @@ each cell shows the best method for that dataset-ratio setting.}
 \label{fig:setting_delta}
 \end{figure}
 
+\subsection{Selector routing patterns}
+
+Figure~\ref{fig:route_mix} examines the teacher choices made by the frozen
+selector on the test split. The selector does not collapse to one universal
+teacher. \texttt{caco2\_wang} and \texttt{solubility\_aqsoldb} route most
+samples to \texttt{Desc\_RF}, consistent with the value of physicochemical
+descriptor knowledge for permeability and solubility. In contrast,
+\texttt{vdss\_lombardo} at 10\% training routes 55.6\% of test samples to
+\texttt{ECFP4\_RF}, while \texttt{lipophilicity\_astrazeneca} and
+\texttt{ppbr\_az} show more mixed routing as the train ratio increases. This
+supports the central premise that teacher choice is endpoint- and
+data-regime-dependent rather than a fixed preference for the descriptor-access
+teacher.
+
+We also tested whether selector wins over \texttt{top1\_validation} are simply
+explained by larger teacher conflict. This pattern is not supported by the
+current full matrix: plain-selector wins have slightly lower mean teacher
+prediction range than losses (1.9960 vs. 2.2021). The stronger interpretation is
+therefore more specific: sample-level selection changes the teacher policy
+within a setting, but downstream gains still depend on whether the student can
+use the selected supervision.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.90\linewidth]{../paper_figures_second/fig5_selector_route_mix.pdf}
+\caption{Selector routing choices by endpoint and train ratio. Bars show the
+test-split proportion of samples routed to each RF teacher, averaged across
+three seeds. \(H\) denotes normalized entropy of the routing distribution.}
+\label{fig:route_mix}
+\end{figure}
+
 \subsection{Negative and secondary ablations}
 
 \begin{table}[t]

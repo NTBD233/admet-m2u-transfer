@@ -130,6 +130,7 @@ def collect_selector_metrics(selector_root, selector_model_name):
 
 def build_selector_diagnostics(selector_root, selector_model_name):
     selector_df = collect_selector_metrics(selector_root, selector_model_name)
+    selector_df = selector_df[selector_df["dataset"].isin(DATASETS)].copy()
     rows = [
         {
             "diagnostic": "RF selector validation accuracy",
@@ -169,6 +170,7 @@ def build_selector_diagnostics(selector_root, selector_model_name):
 
 def build_selector_dataset_table(selector_root, selector_model_name):
     selector_df = collect_selector_metrics(selector_root, selector_model_name)
+    selector_df = selector_df[selector_df["dataset"].isin(DATASETS)].copy()
     rows = []
     for dataset, sub in selector_df.groupby("dataset", sort=True):
         rows.append(
@@ -238,10 +240,16 @@ def write_readme(output_root):
         "- `table3_selector_diagnostics`: selector predictability and gate-target diagnostics.",
         "- `table4_selector_quality_by_dataset`: selector accuracy by endpoint.",
         "- `table5_secondary_ablation_summary`: partial secondary/negative ablations.",
+        "- `table6_failure_mode_probe`: setting-level probes separating teacher-selection",
+        "  quality from student utilization of routed teacher supervision.",
+        "- `table7_selector_route_mix`: test-split selector routing proportions by",
+        "  dataset and train ratio.",
+        "- `table8_selector_conflict_win_summary`: teacher-conflict summaries grouped by",
+        "  whether selector variants beat the setting-level top-1 teacher baseline.",
         "",
-        "RMSE is lower better. Deltas are target minus reference, so negative is better.",
+        "Lower RMSE is better. Deltas are target minus reference, so negative is better.",
     ]
-    (output_root / "README.md").write_text("\n".join(lines), encoding="utf-8")
+    (output_root / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def parse_args():

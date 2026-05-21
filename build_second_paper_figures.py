@@ -193,12 +193,42 @@ def figure_selector_quality():
     savefig(fig, "fig4_selector_quality")
 
 
+def figure_selector_route_mix():
+    df = pd.read_csv(TABLES / "table7_selector_route_mix.csv")
+    datasets = ["caco2_wang", "lipophilicity_astrazeneca", "solubility_aqsoldb", "vdss_lombardo", "ppbr_az"]
+    ratios = [10, 20, 50]
+    teacher_cols = ["select_ECFP4_RF", "select_Desc_RF", "select_ECFP4_Desc_RF"]
+    teacher_labels = ["ECFP4 RF", "Desc RF", "ECFP4+Desc RF"]
+    colors = ["#6f93bf", "#d89b5a", "#8fbf8f"]
+
+    fig, axes = plt.subplots(len(datasets), 1, figsize=(6.8, 5.6), sharex=True)
+    x = np.arange(len(ratios))
+    for ax, dataset in zip(axes, datasets):
+        sub = df[df["dataset"] == dataset].set_index("train_ratio").loc[ratios]
+        bottom = np.zeros(len(ratios))
+        for col, label, color in zip(teacher_cols, teacher_labels, colors):
+            vals = sub[col].astype(float).to_numpy()
+            ax.bar(x, vals, bottom=bottom, color=color, edgecolor="white", linewidth=0.5, label=label)
+            bottom += vals
+        ax.set_ylim(0, 1)
+        ax.set_yticks([0, 0.5, 1.0])
+        ax.set_ylabel(dataset, rotation=0, ha="right", va="center", labelpad=88)
+        for xi, entropy in zip(x, sub["route_entropy"].astype(float)):
+            ax.text(xi, 1.03, f"H={entropy:.2f}", ha="center", va="bottom", fontsize=7)
+    axes[-1].set_xticks(x, [f"{ratio}%" for ratio in ratios])
+    axes[-1].set_xlabel("Train ratio")
+    axes[0].legend(frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.62))
+    fig.suptitle("Selector routing choices by endpoint and train ratio", y=1.01, fontsize=11, weight="bold")
+    savefig(fig, "fig5_selector_route_mix")
+
+
 def main():
     setup()
     figure_method_diagram()
     figure_main_rmse()
     figure_setting_heatmap()
     figure_selector_quality()
+    figure_selector_route_mix()
     print(f"Wrote figures to {OUT}")
 
 
