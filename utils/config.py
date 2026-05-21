@@ -49,6 +49,26 @@ DATASETS = {
         "higher_is_better": False,
         "main_metric": "rmse",
     },
+    "clearance_hepatocyte_az": {
+        "task_type": "regression",
+        "higher_is_better": False,
+        "main_metric": "rmse",
+    },
+    "clearance_microsome_az": {
+        "task_type": "regression",
+        "higher_is_better": False,
+        "main_metric": "rmse",
+    },
+    "half_life_obach": {
+        "task_type": "regression",
+        "higher_is_better": False,
+        "main_metric": "rmse",
+    },
+    "ld50_zhu": {
+        "task_type": "regression",
+        "higher_is_better": False,
+        "main_metric": "rmse",
+    },
     "hia_hou": {
         "task_type": "classification",
         "higher_is_better": True,

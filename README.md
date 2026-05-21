@@ -46,6 +46,8 @@ The research configuration now includes these ADMET datasets:
   `bioavailability_ma`, `herg`
 - regression: `caco2_wang`, `lipophilicity_astrazeneca`,
   `solubility_aqsoldb`, `vdss_lombardo`, `ppbr_az`
+- regression extension panel: `clearance_hepatocyte_az`,
+  `clearance_microsome_az`, `half_life_obach`, `ld50_zhu`
 
 Each CSV should keep the original notebook columns:
 
@@ -99,6 +101,20 @@ make summary
 ```
 
 This writes `.npz` feature files under `data/features_m2u/`.
+
+For the second-paper regression extension panel, use these scoped targets:
+
+```bash
+make second-paper-extension-features
+make ml-baselines-extension-regression
+make teacher-predictions-extension-regression
+make teacher-selector-extension-regression
+make base-extension-regression
+make distill-extension-regression
+make multiteacher-top1-extension-regression
+make pretrained-selector-top1-extension-regression
+make pretrained-selector-top1-high-resource-lambda-extension-regression
+```
 
 ## Train
 

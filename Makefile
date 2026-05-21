@@ -1,7 +1,9 @@
 SHELL := /bin/bash
 PYTHON ?= python
+SECOND_PAPER_MAIN_REGRESSION_DATASETS := caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az
+SECOND_PAPER_EXTENSION_REGRESSION_DATASETS := clearance_hepatocyte_az clearance_microsome_az half_life_obach ld50_zhu
 
-.PHONY: setup prepare features smoke train train-low-resource ml-baselines lambda-ablation analysis paper-tables second-paper-tables summary teacher-predictions-regression teacher-predictions-classification-supplement teacher-predictions-multiteacher teacher-selector-smoke teacher-selector-regression teacher-selector-classification-supplement teacher-reliability gate-target-diagnostics selector-calibration-route-audit selector-routing-patterns pretrained-selector-summary selector-calibration-comparison selector-calibration-full-comparison multiteacher-uniform-smoke multiteacher-validation-smoke multiteacher-top1-smoke multiteacher-uncertainty-smoke multiteacher-uncertainty-prior-smoke multiteacher-uncertainty-disagreement-smoke multiteacher-uncertainty-student-smoke multiteacher-uncertainty-student-prior-smoke multiteacher-uncertainty-composite-smoke multiteacher-learned-gate-smoke multiteacher-learned-linear-gate-smoke multiteacher-learned-prior-residual-smoke multiteacher-supervised-prior-residual-smoke multiteacher-supervised-hard-top1-smoke multiteacher-supervised-hard-top2-smoke pretrained-selector-top1-smoke pretrained-selector-top1-reweight-smoke pretrained-selector-top1-reweight-ppbr-smoke pretrained-selector-top1-disagreement-reweight-smoke pretrained-selector-top1-disagreement-reweight-ppbr-smoke pretrained-selector-top1-auto-reweight-smoke pretrained-selector-top1-auto-reweight-ppbr-smoke pretrained-selector-top1-auto-reweight-partial-regression selector-utilization-sanity selector-utilization-sanity-analysis validation-selected-reweight-partial-regression validation-selected-reweight-summary pretrained-selector-top1-ratio-lambda-smoke pretrained-selector-top1-ratio-lambda-ppbr50-smoke pretrained-selector-top1-ratio-lambda-partial-regression pretrained-selector-top1-high-resource-lambda-partial-regression pretrained-selector-top1-high-resource-lambda-regression pretrained-selector-confidence-fallback-top1-smoke pretrained-selector-validation-blend-top1-smoke pretrained-selector-top2-smoke selector-filtered-uniform-smoke selector-filtered-validation-smoke pretrained-selector-top1-regression pretrained-selector-top2-regression selector-filtered-validation-regression distill-regression distill-regression-summary distill-lambda-sweep distill-lambda-summary distill-lambda-analysis distill-adaptive-smoke distill-adaptive-regression distill-adaptive-summary
+.PHONY: setup prepare features second-paper-extension-features smoke train train-low-resource base-extension-regression ml-baselines ml-baselines-extension-regression lambda-ablation analysis paper-tables second-paper-tables summary teacher-predictions-regression teacher-predictions-extension-regression teacher-predictions-classification-supplement teacher-predictions-multiteacher teacher-selector-smoke teacher-selector-regression teacher-selector-extension-regression teacher-selector-classification-supplement teacher-reliability gate-target-diagnostics selector-calibration-route-audit selector-routing-patterns pretrained-selector-summary extension-selector-summary selector-calibration-comparison selector-calibration-full-comparison multiteacher-uniform-smoke multiteacher-validation-smoke multiteacher-top1-smoke multiteacher-top1-extension-regression multiteacher-uncertainty-smoke multiteacher-uncertainty-prior-smoke multiteacher-uncertainty-disagreement-smoke multiteacher-uncertainty-student-smoke multiteacher-uncertainty-student-prior-smoke multiteacher-uncertainty-composite-smoke multiteacher-learned-gate-smoke multiteacher-learned-linear-gate-smoke multiteacher-learned-prior-residual-smoke multiteacher-supervised-prior-residual-smoke multiteacher-supervised-hard-top1-smoke multiteacher-supervised-hard-top2-smoke pretrained-selector-top1-smoke pretrained-selector-top1-reweight-smoke pretrained-selector-top1-reweight-ppbr-smoke pretrained-selector-top1-disagreement-reweight-smoke pretrained-selector-top1-disagreement-reweight-ppbr-smoke pretrained-selector-top1-auto-reweight-smoke pretrained-selector-top1-auto-reweight-ppbr-smoke pretrained-selector-top1-auto-reweight-partial-regression selector-utilization-sanity selector-utilization-sanity-analysis validation-selected-reweight-partial-regression validation-selected-reweight-summary pretrained-selector-top1-ratio-lambda-smoke pretrained-selector-top1-ratio-lambda-ppbr50-smoke pretrained-selector-top1-ratio-lambda-partial-regression pretrained-selector-top1-high-resource-lambda-partial-regression pretrained-selector-top1-high-resource-lambda-regression pretrained-selector-confidence-fallback-top1-smoke pretrained-selector-validation-blend-top1-smoke pretrained-selector-top2-smoke selector-filtered-uniform-smoke selector-filtered-validation-smoke pretrained-selector-top1-regression pretrained-selector-top1-extension-regression pretrained-selector-top1-high-resource-lambda-extension-regression pretrained-selector-top2-regression selector-filtered-validation-regression distill-regression distill-extension-regression distill-regression-summary distill-lambda-sweep distill-lambda-summary distill-lambda-analysis distill-adaptive-smoke distill-adaptive-regression distill-adaptive-summary
 
 setup:
 	bash setup_env.sh
@@ -12,6 +14,9 @@ prepare:
 features:
 	$(PYTHON) train.py --generate-features --features-only --datasets bbb_martins caco2_wang --train-ratio-tags 50
 
+second-paper-extension-features:
+	$(PYTHON) train.py --generate-features --features-only --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --train-ratio-tags 10 20 50
+
 smoke:
 	$(PYTHON) train.py --generate-features --datasets bbb_martins --models ECFP4_MLP --seeds 42 --train-ratio-tags 50
 
@@ -21,8 +26,14 @@ train:
 train-low-resource:
 	$(PYTHON) train.py --generate-features --train-ratio-tags 10 20 50 --skip-existing
 
+base-extension-regression:
+	$(PYTHON) train.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --results-root results_extension_base_adapterfusion --skip-existing
+
 ml-baselines:
 	$(PYTHON) train_ml_baselines.py --train-ratio-tags 10 20 50 --skip-existing
+
+ml-baselines-extension-regression:
+	$(PYTHON) train_ml_baselines.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --train-ratio-tags 10 20 50 --skip-existing
 
 lambda-ablation:
 	$(PYTHON) train.py --datasets bbb_martins caco2_wang --models ECFP4_MLP_DescPred --seeds 42 123 3407 --lambda-transfer 0.01 --results-root results_lambda/lambda_0_01
@@ -44,19 +55,25 @@ summary:
 	$(PYTHON) evaluate.py
 
 teacher-predictions-regression:
-	$(PYTHON) generate_teacher_predictions.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --teacher-model ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --skip-existing
+	$(PYTHON) generate_teacher_predictions.py --datasets $(SECOND_PAPER_MAIN_REGRESSION_DATASETS) --teacher-model ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --skip-existing
+
+teacher-predictions-extension-regression:
+	$(PYTHON) generate_teacher_predictions.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --skip-existing
 
 teacher-predictions-classification-supplement:
 	$(PYTHON) generate_teacher_predictions.py --datasets bbb_martins hia_hou pgp_broccatelli bioavailability_ma herg --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --skip-existing
 
 teacher-predictions-multiteacher:
-	$(PYTHON) generate_teacher_predictions.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF ECFP4_XGB Desc_XGB ECFP4_Desc_XGB --train-ratio-tags 10 20 50 --seeds 42 123 3407 --skip-existing
+	$(PYTHON) generate_teacher_predictions.py --datasets $(SECOND_PAPER_MAIN_REGRESSION_DATASETS) --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF ECFP4_XGB Desc_XGB ECFP4_Desc_XGB --train-ratio-tags 10 20 50 --seeds 42 123 3407 --skip-existing
 
 teacher-selector-smoke:
 	$(PYTHON) train_teacher_selector.py --datasets caco2_wang --teachers ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 --seeds 42 --selector-models rf logistic --output-root data/selector_predictions
 
 teacher-selector-regression:
-	$(PYTHON) train_teacher_selector.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --teachers ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --selector-models rf --output-root data/selector_predictions --skip-existing
+	$(PYTHON) train_teacher_selector.py --datasets $(SECOND_PAPER_MAIN_REGRESSION_DATASETS) --teachers ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --selector-models rf --output-root data/selector_predictions --skip-existing
+
+teacher-selector-extension-regression:
+	$(PYTHON) train_teacher_selector.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --teachers ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --selector-models rf --output-root data/selector_predictions --skip-existing
 
 teacher-selector-classification-supplement:
 	$(PYTHON) train_teacher_selector.py --datasets bbb_martins hia_hou pgp_broccatelli bioavailability_ma herg --teachers ECFP4_RF Desc_RF ECFP4_Desc_RF --train-ratio-tags 10 20 50 --seeds 42 123 3407 --selector-models rf --output-root data/selector_predictions --skip-existing
@@ -81,6 +98,9 @@ multiteacher-validation-smoke:
 
 multiteacher-top1-smoke:
 	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy top1_validation --lambda-distill 1.0 --results-root results_multiteacher_top1_smoke
+
+multiteacher-top1-extension-regression:
+	$(PYTHON) train.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy top1_validation --lambda-distill 1.0 --results-root results_multiteacher_top1_extension_regression --skip-existing
 
 multiteacher-uncertainty-smoke:
 	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --multiteacher-strategy uncertainty_only --lambda-distill 1.0 --results-root results_multiteacher_uncertainty_smoke
@@ -190,7 +210,13 @@ selector-filtered-validation-smoke:
 	$(PYTHON) train.py --datasets caco2_wang --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 --seeds 42 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --selector-root data/selector_predictions --selector-model-name rf_crossfit_train_pseudo_oracle --multiteacher-strategy selector_filtered_validation_weighted --lambda-distill 1.0 --results-root results_selector_filtered_validation_smoke
 
 pretrained-selector-top1-regression:
-	$(PYTHON) train.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --selector-root data/selector_predictions --selector-model-name rf_crossfit_train_pseudo_oracle --multiteacher-strategy pretrained_selector_top1 --lambda-distill 1.0 --results-root results_pretrained_selector_top1_regression --skip-existing
+	$(PYTHON) train.py --datasets $(SECOND_PAPER_MAIN_REGRESSION_DATASETS) --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --selector-root data/selector_predictions --selector-model-name rf_crossfit_train_pseudo_oracle --multiteacher-strategy pretrained_selector_top1 --lambda-distill 1.0 --results-root results_pretrained_selector_top1_regression --skip-existing
+
+pretrained-selector-top1-extension-regression:
+	$(PYTHON) train.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --selector-root data/selector_predictions --selector-model-name rf_crossfit_train_pseudo_oracle --multiteacher-strategy pretrained_selector_top1 --lambda-distill 1.0 --results-root results_pretrained_selector_top1_extension_regression --skip-existing
+
+pretrained-selector-top1-high-resource-lambda-extension-regression:
+	$(PYTHON) train.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --selector-root data/selector_predictions --selector-model-name rf_crossfit_train_pseudo_oracle --multiteacher-strategy pretrained_selector_top1 --lambda-distill 1.0 --lambda-distill-ratio-schedule high_resource_decay --results-root results_pretrained_selector_top1_high_resource_lambda_extension_regression --skip-existing
 
 pretrained-selector-top2-regression:
 	$(PYTHON) train.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-models ECFP4_RF Desc_RF ECFP4_Desc_RF --selector-root data/selector_predictions --selector-model-name rf_crossfit_train_pseudo_oracle --multiteacher-strategy pretrained_selector_top2 --lambda-distill 1.0 --results-root results_pretrained_selector_top2_regression --skip-existing
@@ -201,6 +227,9 @@ selector-filtered-validation-regression:
 pretrained-selector-summary:
 	$(PYTHON) compare_pretrained_selector.py --results base=results selector_top1=results_pretrained_selector_top1_regression selector_top2=results_pretrained_selector_top2_regression selector_filtered=results_selector_filtered_validation_regression --output-root results_pretrained_selector_analysis
 
+extension-selector-summary:
+	$(PYTHON) compare_pretrained_selector.py --results base=results_extension_base_adapterfusion selector_top1=results_pretrained_selector_top1_extension_regression high_decay=results_pretrained_selector_top1_high_resource_lambda_extension_regression fixed_ecfp_desc=results_distill_extension_regression top1_validation=results_multiteacher_top1_extension_regression --output-root results_extension_selector_analysis
+
 selector-calibration-comparison:
 	$(PYTHON) compare_selector_calibration.py
 
@@ -209,6 +238,9 @@ selector-calibration-full-comparison:
 
 distill-regression:
 	$(PYTHON) train.py --datasets caco2_wang lipophilicity_astrazeneca solubility_aqsoldb vdss_lombardo ppbr_az --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-model ECFP4_Desc_RF --lambda-distill 0.1 --results-root results_distill_regression --skip-existing
+
+distill-extension-regression:
+	$(PYTHON) train.py --datasets $(SECOND_PAPER_EXTENSION_REGRESSION_DATASETS) --models ECFP4_MLP_DescAdapterFusion --train-ratio-tags 10 20 50 --seeds 42 123 3407 --teacher-root data/teacher_predictions --teacher-model ECFP4_Desc_RF --lambda-distill 0.1 --results-root results_distill_extension_regression --skip-existing
 
 distill-regression-summary:
 	$(PYTHON) evaluate.py --results-root results_distill_regression
