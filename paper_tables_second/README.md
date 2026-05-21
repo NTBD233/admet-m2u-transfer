@@ -8,4 +8,4 @@
 - `table6_failure_mode_probe`: setting-level probes separating teacher-selection
   quality from student utilization of routed teacher supervision.
 
-RMSE is lower better. Deltas are target minus reference, so negative is better.
+Lower RMSE is better. Deltas are target minus reference, so negative is better.

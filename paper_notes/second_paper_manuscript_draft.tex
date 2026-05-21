@@ -308,6 +308,9 @@ pseudo-oracle teacher is determined only by teachers that did not fit that
 sample in the corresponding fold. Validation and test examples are not used to
 construct selector supervision; validation predictions are used only for model
 selection, teacher-prior estimation, and validation-selected baselines.
+The experiment pipeline is organized as Makefile targets for selector training,
+frozen-routing student training, high-resource calibration, and manuscript table
+regeneration from saved metrics.
 
 \subsection{Baselines}
 
@@ -350,7 +353,7 @@ Pretrained selector & 5.0889 & -0.0953 & 34/45 & -0.0732 & 28/45 & 0.0096 & 25/4
 Selector + high-resource decay & 5.0814 & -0.1028 & 34/45 & -0.0807 & 32/45 & 0.0021 & 27/45 & -0.0075 & 9/45 \\
 \bottomrule
 \end{tabular}
-\caption{Full 45-run regression comparison. RMSE is lower better. Deltas are
+\caption{Full 45-run regression comparison. Lower RMSE is better. Deltas are
 method minus reference, so negative values indicate improvement.}
 \label{tab:main}
 \end{table}
