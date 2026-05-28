@@ -11,5 +11,7 @@
   dataset and train ratio.
 - `table8_selector_conflict_win_summary`: teacher-conflict summaries grouped by
   whether selector variants beat the setting-level top-1 teacher baseline.
+- `table9_extension_aggregate_rmse`: four-endpoint extension-panel aggregate.
+- `table10_extension_by_setting_rmse`: extension-panel dataset x train-ratio RMSE table.
 
 Lower RMSE is better. Deltas are target minus reference, so negative is better.

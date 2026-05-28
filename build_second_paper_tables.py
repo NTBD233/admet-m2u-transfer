@@ -16,6 +16,12 @@ DATASETS = [
     "vdss_lombardo",
     "ppbr_az",
 ]
+EXTENSION_DATASETS = [
+    "clearance_hepatocyte_az",
+    "clearance_microsome_az",
+    "half_life_obach",
+    "ld50_zhu",
+]
 RATIOS = [10, 20, 50]
 
 MAIN_METHODS = {
@@ -26,6 +32,14 @@ MAIN_METHODS = {
     "Top-1 validation": "results_multiteacher_top1",
     "Pretrained selector": "results_pretrained_selector_top1_regression",
     "Selector + high-resource decay": "results_pretrained_selector_top1_high_resource_lambda_regression",
+}
+
+EXTENSION_METHODS = {
+    "Base AdapterFusion": "results_extension_base_adapterfusion",
+    "Fixed ECFP4+Desc RF": "results_distill_extension_regression",
+    "Top-1 validation": "results_multiteacher_top1_extension_regression",
+    "Pretrained selector": "results_pretrained_selector_top1_extension_regression",
+    "Selector + high-resource decay": "results_pretrained_selector_top1_high_resource_lambda_extension_regression",
 }
 
 PARTIAL_METHODS = {
@@ -114,6 +128,56 @@ def build_main_setting_table(method_roots):
             row["best_method"] = min(means, key=means.get)
             row["delta_selector_decay_vs_plain"] = f"{means['Selector + high-resource decay'] - means['Pretrained selector']:.4f}"
             row["delta_selector_decay_vs_top1"] = f"{means['Selector + high-resource decay'] - means['Top-1 validation']:.4f}"
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def build_extension_aggregate(method_roots):
+    merged = merge_methods(method_roots, datasets=EXTENSION_DATASETS, ratios=RATIOS)
+    rows = []
+    references = {
+        "base": "Base AdapterFusion",
+        "fixed": "Fixed ECFP4+Desc RF",
+        "top1": "Top-1 validation",
+        "selector": "Pretrained selector",
+    }
+    for method in method_roots:
+        row = {
+            "method": method,
+            "runs": int(merged[method].notna().sum()),
+            "mean_test_rmse": f"{merged[method].mean():.4f}",
+        }
+        for label, reference in references.items():
+            if method == reference:
+                row[f"wins_{label}"] = ""
+                row[f"delta_{label}"] = ""
+                continue
+            delta = merged[method] - merged[reference]
+            row[f"wins_{label}"] = f"{int((delta < 0).sum())}/{len(delta)}"
+            row[f"delta_{label}"] = f"{delta.mean():.4f}"
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def build_extension_setting_table(method_roots):
+    rows = []
+    method_frames = {
+        method: load_method_frame(method, root, datasets=EXTENSION_DATASETS, ratios=RATIOS)
+        for method, root in method_roots.items()
+    }
+    for dataset in EXTENSION_DATASETS:
+        for ratio in RATIOS:
+            row = {"dataset": dataset, "train_ratio": ratio}
+            means = {}
+            for method, df in method_frames.items():
+                setting = df[(df["dataset"] == dataset) & (df["train_ratio_tag"] == ratio)]
+                means[method] = setting["test_rmse"].mean()
+                row[method] = format_mean_std(means[method], setting["test_rmse"].std(ddof=1))
+            row["best_method"] = min(means, key=means.get)
+            row["delta_selector_vs_base"] = f"{means['Pretrained selector'] - means['Base AdapterFusion']:.4f}"
+            row["delta_selector_vs_fixed"] = f"{means['Pretrained selector'] - means['Fixed ECFP4+Desc RF']:.4f}"
+            row["delta_selector_vs_top1"] = f"{means['Pretrained selector'] - means['Top-1 validation']:.4f}"
+            row["delta_decay_vs_selector"] = f"{means['Selector + high-resource decay'] - means['Pretrained selector']:.4f}"
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -246,6 +310,8 @@ def write_readme(output_root):
         "  dataset and train ratio.",
         "- `table8_selector_conflict_win_summary`: teacher-conflict summaries grouped by",
         "  whether selector variants beat the setting-level top-1 teacher baseline.",
+        "- `table9_extension_aggregate_rmse`: four-endpoint extension-panel aggregate.",
+        "- `table10_extension_by_setting_rmse`: extension-panel dataset x train-ratio RMSE table.",
         "",
         "Lower RMSE is better. Deltas are target minus reference, so negative is better.",
     ]
@@ -266,6 +332,8 @@ def main():
     outputs = []
     outputs.extend(write_table(build_main_aggregate(MAIN_METHODS), output_root, "table1_main_aggregate_rmse"))
     outputs.extend(write_table(build_main_setting_table(MAIN_METHODS), output_root, "table2_main_by_setting_rmse"))
+    outputs.extend(write_table(build_extension_aggregate(EXTENSION_METHODS), output_root, "table9_extension_aggregate_rmse"))
+    outputs.extend(write_table(build_extension_setting_table(EXTENSION_METHODS), output_root, "table10_extension_by_setting_rmse"))
     outputs.extend(
         write_table(
             build_selector_diagnostics(args.selector_root, args.selector_model_name),

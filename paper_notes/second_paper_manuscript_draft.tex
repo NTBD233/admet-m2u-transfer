@@ -394,6 +394,48 @@ aggregate mean remains marginally higher than \texttt{top1\_validation} by
 +0.0021 RMSE. We therefore treat high-resource decay as a useful calibration
 of selector routing rather than as a separate main contribution.
 
+\subsection{Extension-panel robustness}
+
+To test whether the five-endpoint result is narrowly tied to the original
+benchmark panel, we also ran a four-endpoint regression extension panel:
+\texttt{clearance\_hepatocyte\_az}, \texttt{clearance\_microsome\_az},
+\texttt{half\_life\_obach}, and \texttt{ld50\_zhu}. This panel was not used to
+define the main method or tune selector routing; we use it as a robustness
+check for the calibrated claim.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Method & RMSE & \(\Delta\) Base & Wins & \(\Delta\) Fixed & Wins & \(\Delta\) Top1 & Wins \\
+\midrule
+Base AdapterFusion & 27.8369 & -- & -- & 0.0226 & 14/36 & 0.4880 & 9/36 \\
+Fixed ECFP4+Desc RF & 27.8143 & -0.0226 & 22/36 & -- & -- & 0.4654 & 9/36 \\
+Top-1 validation & 27.3490 & -0.4880 & 27/36 & -0.4654 & 27/36 & -- & -- \\
+Pretrained selector & 27.4158 & -0.4211 & 26/36 & -0.3985 & 25/36 & 0.0668 & 16/36 \\
+Selector + high-resource decay & 27.4865 & -0.3504 & 26/36 & -0.3278 & 27/36 & 0.1376 & 16/36 \\
+\bottomrule
+\end{tabular}
+\caption{Four-endpoint extension-panel robustness check. Lower RMSE is better.
+Deltas are method minus reference. The extension panel contains 36
+dataset-ratio-seed runs.}
+\label{tab:extension_robustness}
+\end{table}
+
+Table~\ref{tab:extension_robustness} supports the bounded version of the
+claim. Pretrained selector routing improves over base AdapterFusion and fixed
+single-teacher distillation on mean RMSE, and it wins 26/36 and 25/36
+seed-level runs against those references, respectively. However,
+\texttt{top1\_validation} remains the strongest extension-panel baseline on
+mean RMSE, and the selector wins only 16/36 seed-level runs against it. The
+high-resource decay schedule is also weaker on this extension panel. We
+therefore keep the manuscript claim focused: supervised teacher selection
+improves ECFP-only distillation over base and fixed-teacher training, while
+validation-level teacher choice remains a strong baseline that sample-level
+routing does not uniformly dominate.
+
 \subsection{Dataset and train-ratio behavior}
 
 The dataset-ratio results show that the benefit of selector routing is not
